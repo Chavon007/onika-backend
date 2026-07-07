@@ -2,9 +2,10 @@ import express from "express";
 import dotenv from "dotenv";
 import cookies from "cookie-parser";
 import cors from "cors";
+import AuthRoutes from "./route/authRoute.js";
+import { dbConfig } from "./config/dbConfig.js";
 dotenv.config();
 const app = express();
-
 app.use(express.json());
 app.use(
   cors({
@@ -18,7 +19,17 @@ const PORT = 4000;
 app.get("/", (req, res) => {
   res.send("Onika backend is running");
 });
+app.use("/api/auth", AuthRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Server is runing on port http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await dbConfig();
+    app.listen(PORT, () => {
+      console.log(`Server is runing on port http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+startServer();
