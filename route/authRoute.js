@@ -8,11 +8,16 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 import { validate } from "../middleware/validation.js";
 import createAccount from "../controller/authController.js";
 import { login, verifyOtp } from "../controller/authController.js";
+import { authLimiter } from "../utliz/rateLimiter.js";
 const router = express.Router();
 
-router.post("/signup", createAccountValidator, validate, createAccount);
-
-router.post("/login", loginValidator, validate, login);
-router.post("/verify-otp", OTPValidator, validate, verifyOtp);
-
+router.post(
+  "/signup",
+  authLimiter,
+  createAccountValidator,
+  validate,
+  createAccount,
+);
+router.post("/login", authLimiter, loginValidator, validate, login);
+router.post("/verify-otp", authLimiter, OTPValidator, validate, verifyOtp);
 export default router;

@@ -1,5 +1,10 @@
 import express from "express";
 import dotenv from "dotenv";
+import {
+  generalLimiter,
+  authLimiter,
+  verificationLimiter,
+} from "./utliz/rateLimiter.js";
 import cookies from "cookie-parser";
 import cors from "cors";
 import AuthRoutes from "./route/authRoute.js";
@@ -17,6 +22,7 @@ app.use(
   }),
 );
 app.use(cookies());
+app.use(generalLimiter);
 const PORT = 4000;
 
 app.get("/", (req, res) => {
