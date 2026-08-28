@@ -28,8 +28,18 @@ export const createAccountValidator = [
     .notEmpty()
     .withMessage("Phone number is required")
     .isLength({ min: 10 })
-    .withMessage("Phone number can ot be less than 10"),
+    .withMessage("Phone number can not be less than 10"),
 
   body("state").trim().notEmpty().withMessage("State is required"),
   body("lga").trim().notEmpty().withMessage("Local government areais required"),
+];
+
+export const loginValidator = [
+  body("email").trim().notEmpty().withMessage("Email is required"),
+
+  body("password").trim().notEmpty().withMessage("Password is required"),
+];
+
+export const OTPValidator = [
+  body("OTP").trim().notEmpty().withMessage("OTP is required"),
 ];

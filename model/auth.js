@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -21,7 +22,14 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-
+    otp: {
+      type: String,
+      default: null,
+    },
+    otpExpiresAt: {
+      type: Date,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["customer", "artisan", "admin"],
@@ -43,7 +51,7 @@ const userSchema = new mongoose.Schema(
       required: true,
     },
 
-    verified: {
+    isVerified: {
       type: Boolean,
       default: false,
     },
@@ -59,7 +67,7 @@ const userSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export default mongoose.model("User", userSchema);

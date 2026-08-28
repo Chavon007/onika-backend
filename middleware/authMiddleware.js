@@ -7,7 +7,7 @@ export const authMiddleware = async (req, res, next) => {
     if (!token) {
       return res
         .status(401)
-        .json({ success: error, message: "User not authenticated" });
+        .json({ success: false, message: "User not authenticated" });
     }
     const decoded = verifyToken(token);
     req.user = decoded;
