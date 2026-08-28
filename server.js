@@ -6,6 +6,7 @@ import AuthRoutes from "./route/authRoute.js";
 import { dbConfig } from "./config/dbConfig.js";
 import AristanProfileRoute from "./route/artisanProfileRoute.js";
 import auth from "./model/auth.js";
+import CloudinaryRouter from "./route/cloudinary.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -23,6 +24,7 @@ app.get("/", (req, res) => {
 });
 app.use("/api/auth", AuthRoutes);
 app.use("/api/artisan", AristanProfileRoute);
+app.use("/cloudinary", CloudinaryRouter);
 
 const startServer = async () => {
   try {
