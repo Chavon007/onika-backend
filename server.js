@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+dotenv.config();
 import {
   generalLimiter,
   authLimiter,
@@ -12,7 +13,8 @@ import { dbConfig } from "./config/dbConfig.js";
 import AristanProfileRoute from "./route/artisanProfileRoute.js";
 import auth from "./model/auth.js";
 import CloudinaryRouter from "./route/cloudinary.js";
-dotenv.config();
+import redisclient from "./config/redis.js";
+
 const app = express();
 app.use(express.json());
 app.use(
