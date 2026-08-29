@@ -1,6 +1,6 @@
 import { hashPassword, comparePassword } from "../utliz/hash.js";
 import User from "../model/auth.js";
-import { generateToken } from "../utliz/token.js";
+import { generateToken, generateRefreshToken } from "../utliz/token.js";
 import sendOtpEmail from "../utliz/sendEmail.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
@@ -76,12 +76,13 @@ export const loginService = async ({ email, password }) => {
   }
 
   const token = generateToken(user);
-
+  const refreshToken = generateRefreshToken(user);
   const userObject = user.toObject();
   delete userObject.password;
   return {
     user: userObject,
     token,
+    refreshToken,
   };
 };
 
@@ -131,12 +132,14 @@ export const OtpService = async ({ OTP, email }) => {
   await existingUser.save();
 
   const token = generateToken(existingUser);
+  const refreshToken = generateRefreshToken(existingUser);
   const userObject = existingUser.toObject();
   delete userObject.password;
   return {
     message: "OTP verified successfully",
     user: userObject,
     token,
+    refreshToken,
   };
 };
 export default createAccountService;

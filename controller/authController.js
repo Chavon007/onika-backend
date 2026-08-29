@@ -6,7 +6,12 @@ import {
   fetchUser,
 } from "../service/authService.js";
 import redisClient from "../config/redis.js";
-import { verifyToken } from "../utliz/token.js";
+import {
+  verifyToken,
+  verifyRefreshToken,
+  generateToken,
+} from "../utliz/token.js";
+import User from "../model/auth.js";
 
 const createAccount = async (req, res) => {
   try {
@@ -32,7 +37,13 @@ export const login = async (req, res) => {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 3600000,
+      maxAge: 15 * 60 * 1000,
+    });
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res
@@ -65,7 +76,14 @@ export const verifyOtp = async (req, res) => {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      maxAge: 3600000,
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     res.status(200).json({ success: true, message: "Verification successful" });
   } catch (err) {
@@ -109,6 +127,51 @@ export const logout = async (req, res) => {
       sameSite: "lax",
     });
     res.status(200).json({ success: true, message: "Logged out successfully" });
+  }
+};
+
+export const refresh = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return res
+        .status(401)
+        .json({ success: false, message: "No refresh token" });
+    }
+
+    const isBlackListed = await redisClient.get(`bl:${refreshToken}`);
+    if (isBlackListed) {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired, please login again",
+      });
+    }
+    const decoded = verifyRefreshToken(refreshToken);
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res
+        .status(401)
+        .json({ success: false, message: "User not found" });
+    }
+    const newAccessToken = generateToken(user);
+
+    res.cookie("token", newAccessToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.status(200).json({ success: true, message: "Token refreshed" });
+  } catch (err) {
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired, please login again",
+      });
+    }
+    res.status(401).json({ success: false, message: "Invalid refresh token" });
   }
 };
 export default createAccount;
