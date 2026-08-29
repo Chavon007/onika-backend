@@ -32,7 +32,7 @@ app.get("/", (req, res) => {
 });
 app.use("/api/auth", AuthRoutes);
 app.use("/api/artisan", AristanProfileRoute);
-app.use("/cloudinary", CloudinaryRouter);
+app.use("/api/cloudinary", CloudinaryRouter);
 
 const startServer = async () => {
   try {

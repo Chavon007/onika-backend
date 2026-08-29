@@ -3,6 +3,7 @@ import {
   loginService,
   generateOTP,
   OtpService,
+  fetchUser,
 } from "../service/authService.js";
 import redisClient from "../config/redis.js";
 import { verifyToken } from "../utliz/token.js";
@@ -44,6 +45,17 @@ export const login = async (req, res) => {
   }
 };
 
+export const getMe = async (req, res) => {
+  try {
+    const email = req.user.email;
+    const user = await fetchUser({ email });
+    res.status(200).json({ success: true, data: user });
+  } catch (err) {
+    res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
+  }
+};
 export const verifyOtp = async (req, res) => {
   try {
     const { email, OTP } = req.body;

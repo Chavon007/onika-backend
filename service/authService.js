@@ -40,7 +40,7 @@ const createAccountService = async ({
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
-    const err = new Error("Email already exist")
+    const err = new Error("Email already exist");
     err.statusCode = 409;
     throw err;
   }
@@ -63,9 +63,9 @@ const createAccountService = async ({
 export const loginService = async ({ email, password }) => {
   const user = await User.findOne({ email });
   if (!user) {
-  const err = new Error("Invalid credentials");
-   err.statusCode = 401;
-   throw err;
+    const err = new Error("Invalid credentials");
+    err.statusCode = 401;
+    throw err;
   }
 
   const isMatch = await comparePassword(password, user.password);
@@ -85,6 +85,18 @@ export const loginService = async ({ email, password }) => {
   };
 };
 
+export const fetchUser = async ({ email }) => {
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    const err = new Error("User does not have account");
+    err.statusCode = 404;
+    throw err;
+  }
+  const userObject = user.toObject();
+  delete userObject.password;
+  return userObject;
+};
 export const OtpService = async ({ OTP, email }) => {
   const existingUser = await User.findOne({ email });
 
@@ -92,10 +104,9 @@ export const OtpService = async ({ OTP, email }) => {
     const err = new Error("User does not exist");
     err.statusCode = 404;
     throw err;
-   
   }
   if (!existingUser.otp || !existingUser.otpExpiresAt) {
-    const err = new Error("User did not request for OTP")
+    const err = new Error("User did not request for OTP");
     err.statusCode = 400;
     throw err;
   }
@@ -119,13 +130,13 @@ export const OtpService = async ({ OTP, email }) => {
 
   await existingUser.save();
 
-  const token = generateOTP(existingUser);
+  const token = generateToken(existingUser);
   const userObject = existingUser.toObject();
   delete userObject.password;
   return {
     message: "OTP verified successfully",
-    user: existingUser,
-    token
+    user: userObject,
+    token,
   };
 };
 export default createAccountService;

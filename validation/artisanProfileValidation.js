@@ -1,34 +1,24 @@
 import { body } from "express-validator";
 
 export const artisanProfileValidator = [
-  body("fullname")
-    .trim()
-    .notEmpty()
-    .withMessage("Full name is required")
-    .isLength({ min: 3 })
-    .withMessage("Full name must be at least 3 characters"),
-
-  body("phoneNumber")
-    .trim()
-    .notEmpty()
-    .withMessage("Phone number is required")
-    .isLength({ min: 10 })
-    .withMessage("Phone number can not be less than 10 "),
-  body("city")
-    .trim()
-    .notEmpty()
-    .withMessage("City is reqyured")
-    .isLength({ min: 2 })
-    .withMessage("City can't be less than 2 characters"),
-
   body("bio")
     .trim()
-    .notEmpty("Bio id required")
+    .notEmpty()
+    .withMessage("Bio is required")
     .isLength({ max: 500 })
-    .withMessage("Bio can't be more than 500 caharacters"),
+    .withMessage("Bio can't be more than 500 characters"),
 
-  body("skills").isArray().withMessage("Please select at least one skill"),
+  body("skills")
+    .isArray({ min: 1 })
+    .withMessage("Please select at least one skill"),
+  body("skills.*")
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage("Each skill must be a valid string"),
+
   body("experience").trim().notEmpty().withMessage("Experience is required"),
+
   body("nin")
     .trim()
     .notEmpty()
@@ -41,8 +31,6 @@ export const artisanProfileValidator = [
   body("bvn")
     .optional()
     .trim()
-    .notEmpty()
-    .withMessage("BVN is required")
     .isLength({ min: 11, max: 11 })
     .withMessage("BVN must be exactly 11 digits")
     .isNumeric()
@@ -61,6 +49,7 @@ export const artisanProfileValidator = [
     .withMessage("Face verification is required")
     .isURL()
     .withMessage("Face verification must be a valid URL"),
+
   body("workImage")
     .isArray({ min: 1, max: 6 })
     .withMessage("Please upload between 1 and 6 work images"),

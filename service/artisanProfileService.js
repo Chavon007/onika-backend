@@ -1,5 +1,9 @@
 import artisanProfileModel from "../model/artisanProfileModel.js";
-import { verifyNIN, verifyBVN, verifyFaceMatch } from "./verificationService.js";
+import {
+  verifyNIN,
+  verifyBVN,
+  verifyFaceMatch,
+} from "./verificationService.js";
 
 const runVerificationChecks = async (profile, user) => {
   const [firstname, ...rest] = user.fullName.trim().split(" ");
@@ -8,9 +12,9 @@ const runVerificationChecks = async (profile, user) => {
   try {
     const ninResult = await verifyNIN(profile.nin, firstname, lastname);
     const faceResult = await verifyFaceMatch(
+      profile.faceVerification,
       "nin",
       profile.nin,
-      profile.faceVerification,
     );
 
     const bvnResult = profile.bvn
