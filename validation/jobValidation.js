@@ -55,8 +55,8 @@ export const createJobValidator = [
     .isLength({ min: 3 })
     .withMessage("Landmark must be at least 3 characters"),
   body("images")
-    .isArray({ min: 1, max: 3 })
-    .withMessage("Please upload between 1 and 3 images"),
+    .isArray({ min: 3, max: 6 })
+    .withMessage("Please upload between 3 and 6 images"),
   body("images.*")
     .isString()
     .trim()

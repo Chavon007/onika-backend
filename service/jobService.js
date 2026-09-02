@@ -10,6 +10,7 @@ export const createJob = async ({
   landmark,
   images,
   priority,
+  city
 }) => {
   const newjob = await jobModel.create({
     customerId,
@@ -20,6 +21,7 @@ export const createJob = async ({
     address,
     city,
     landmark,
+    lga,
     images,
     priority,
   });

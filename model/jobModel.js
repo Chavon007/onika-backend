@@ -91,8 +91,8 @@ const JobSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: (arr) =>
-          Array.isArray(arr) && arr.length >= 1 && arr.length <= 3,
-        message: "You must upload between 1 and 3 job images",
+          Array.isArray(arr) && arr.length >= 3 && arr.length <= 6,
+        message: "You must upload between 3 and 6 job images",
       },
     },
     priority: {
