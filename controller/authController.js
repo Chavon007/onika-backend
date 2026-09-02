@@ -32,7 +32,7 @@ const createAccount = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { user, token } = await loginService(req.body);
+    const { user, token, refreshToken } = await loginService(req.body);
     res.cookie("token", token, {
       httpOnly: true,
       secure: false,
@@ -70,7 +70,7 @@ export const getMe = async (req, res) => {
 export const verifyOtp = async (req, res) => {
   try {
     const { email, OTP } = req.body;
-    const { user, token } = await OtpService({ OTP, email });
+    const { user, token, refreshToken } = await OtpService({ OTP, email });
 
     res.cookie("token", token, {
       httpOnly: true,
@@ -96,24 +96,36 @@ export const verifyOtp = async (req, res) => {
 export const logout = async (req, res) => {
   try {
     const token = req.cookies.token;
+    const refreshTokenCookie = req.cookies.refreshToken;
 
-    if (!token) {
-      return res
-        .status(400)
-        .json({ success: false, message: "No active session found" });
+    if (token) {
+      const decoded = verifyToken(token);
+      const now = Math.floor(Date.now() / 1000);
+      const secondsUntilExpiry = decoded.exp - now;
+      if (secondsUntilExpiry > 0) {
+        await redisClient.set(`bl:${token}`, "true", {
+          EX: secondsUntilExpiry,
+        });
+      }
     }
 
-    const decoded = verifyToken(token);
-    const now = Math.floor(Date.now() / 1000);
-    const secondsUntilExpiry = decoded.exp - now;
-
-    if (secondsUntilExpiry > 0) {
-      await redisClient.set(`bl:${token}`, "true", {
-        EX: secondsUntilExpiry,
-      });
+    if (refreshTokenCookie) {
+      const decodedRefresh = verifyRefreshToken(refreshTokenCookie);
+      const now = Math.floor(Date.now() / 1000);
+      const secondsUntilExpiry = decodedRefresh.exp - now;
+      if (secondsUntilExpiry > 0) {
+        await redisClient.set(`bl:${refreshTokenCookie}`, "true", {
+          EX: secondsUntilExpiry,
+        });
+      }
     }
 
     res.clearCookie("token", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+    });
+    res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
@@ -126,10 +138,14 @@ export const logout = async (req, res) => {
       secure: false,
       sameSite: "lax",
     });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+    });
     res.status(200).json({ success: true, message: "Logged out successfully" });
   }
 };
-
 export const refresh = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;

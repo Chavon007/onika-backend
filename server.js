@@ -14,7 +14,7 @@ import AristanProfileRoute from "./route/artisanProfileRoute.js";
 import auth from "./model/auth.js";
 import CloudinaryRouter from "./route/cloudinary.js";
 import redisclient from "./config/redis.js";
-
+import jobRouter from "./route/jobRoute.js";
 const app = express();
 app.use(express.json());
 app.use(
@@ -33,6 +33,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", AuthRoutes);
 app.use("/api/artisan", AristanProfileRoute);
 app.use("/api/cloudinary", CloudinaryRouter);
+app.use("/api", jobRouter);
 
 const startServer = async () => {
   try {

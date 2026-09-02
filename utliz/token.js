@@ -35,4 +35,5 @@ export const generateRefreshToken = (user) => {
 
 export const verifyRefreshToken = (token) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET_REFRESH);
+  return decoded;
 };
