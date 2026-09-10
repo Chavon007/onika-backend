@@ -16,6 +16,11 @@ const JobSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: [],
+    },
     description: {
       type: String,
       required: true,
