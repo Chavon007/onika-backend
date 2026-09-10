@@ -6,6 +6,7 @@ import {
   createNewJob,
   matchJob,
   matchJobDetails,
+  acceptJobController, rejectJobController
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -16,7 +17,8 @@ router.post(
   validate,
   createNewJob,
 );
-   router.get("/jobs/pending", authMiddleware, matchJob);
-   router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
-
+router.get("/jobs/pending", authMiddleware, matchJob);
+router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
+router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
+router.patch("/jobs/:jobId/reject", authMiddleware, rejectJobController);
 export default router;
