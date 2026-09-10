@@ -4,10 +4,15 @@ import {
   findJobsForArtisanDetails,
   ArtisanAcceptJob,
   ArtisanRejectJob,
+  ArtisanActiveJob,
+  ArtisanMarkJobCompleted,
+  ArtisanStartJob,
 } from "../service/jobService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
 import artisanProfileModel from "../model/artisanProfileModel.js";
+
+// Creates a new job posting. Only customers are allowed to post jobs.
 export const createNewJob = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -30,6 +35,9 @@ export const createNewJob = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+// Returns the list of pending jobs available to the logged-in artisan,
+// filtered by their skills, location, and excluding jobs they've rejected.
 export const matchJob = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -63,6 +71,8 @@ export const matchJob = async (req, res) => {
   }
 };
 
+// Returns full details for a single job, for an artisan viewing it directly.
+// Blocks the view if the artisan already rejected it or lacks the required skill.
 export const matchJobDetails = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -114,6 +124,9 @@ export const matchJobDetails = async (req, res) => {
   }
 };
 
+// Lets an artisan accept a pending job. Race-condition safe — see
+// ArtisanAcceptJob in jobService.js for the atomic update that prevents
+// two artisans from accepting the same job at once.
 export const acceptJobController = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -170,6 +183,9 @@ export const acceptJobController = async (req, res) => {
   }
 };
 
+// Lets an artisan decline a pending job before ever accepting it. The job
+// stays pending and visible to everyone else; only this artisan stops
+// seeing it, via rejectedBy in ArtisanRejectJob.
 export const rejectJobController = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -196,7 +212,7 @@ export const rejectJobController = async (req, res) => {
     if (!artisanProfile) {
       return res
         .status(404)
-        .json({ success: false, message: "Artisan profile nt found" });
+        .json({ success: false, message: "Artisan profile not found" });
     }
 
     const { job, forbidden, notFound } = await ArtisanRejectJob(
@@ -215,6 +231,128 @@ export const rejectJobController = async (req, res) => {
     }
 
     res.status(200).json({ success: true, message: "Job rejected", job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Returns all jobs currently accepted by the logged-in artisan (their active work).
+export const artisanActiveJobController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exit" });
+    }
+
+    if (user.role !== "artisan") {
+      return res.status(403).json({
+        success: false,
+        message: "Only artisans can view active jobs",
+      });
+    }
+
+    const { job } = await ArtisanActiveJob(userId);
+    res.status(200).json({ success: true, data: job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Lets an artisan move a job from "accepted" to "in_progress" once they've
+// actually started the work. Only the artisan who accepted the job can do
+// this, and only from the "accepted" state — enforced atomically inside
+// ArtisanStartJob.
+export const artisanStartJobController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid job ID" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+    if (user.role !== "artisan") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Only artisan can mark job as done" });
+    }
+
+    const { job, forbidden, notFound } = await ArtisanStartJob(jobId, userId);
+
+    if (notFound) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+    if (forbidden) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You cannot change this job to in progress — it's either not yours or not accepted",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: " Job is now in progress", data: job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Lets an artisan mark a job as completed once they're done working on it.
+// Only allowed from the "in_progress" state and only by the artisan
+// assigned to the job — enforced atomically inside ArtisanMarkJobCompleted.
+export const artisanMarkJobCompletedController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid job ID" });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "artisan") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Only artisan can mark job as done" });
+    }
+
+    const { job, forbidden, notFound } = await ArtisanMarkJobCompleted(
+      jobId,
+      userId,
+    );
+    if (notFound) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+    if (forbidden) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "You cannot complete this job — it's either not yours or not in progress",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "job marked as completed", data: job });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
