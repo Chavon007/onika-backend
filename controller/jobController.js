@@ -254,8 +254,8 @@ export const artisanActiveJobController = async (req, res) => {
       });
     }
 
-    const { job } = await ArtisanActiveJob(userId);
-    res.status(200).json({ success: true, data: job });
+    const { jobs } = await ArtisanActiveJob(userId);
+    res.status(200).json({ success: true, data: jobs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

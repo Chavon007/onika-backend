@@ -95,7 +95,7 @@ export const ArtisanAcceptJob = async (jobId, artisanId, skills) => {
       artisanId: null,
     },
     { status: "accepted", artisanId },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!updatedJob) {
@@ -125,7 +125,7 @@ export const ArtisanRejectJob = async (jobId, artisanId, skills) => {
       status: "pending",
     },
     { $addToSet: { rejectedBy: artisanId } },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!updatedJob) {
@@ -137,7 +137,7 @@ export const ArtisanRejectJob = async (jobId, artisanId, skills) => {
 // Returns all jobs currently accepted by a given artisan (their active work).
 export const ArtisanActiveJob = async (artisanId) => {
   const activeJobs = await jobModel
-    .find({ artisanId, status: "accepted" })
+    .find({ artisanId, status: { $in: ["accepted", "in_progress"] } })
     .populate("customerId", "fullName phoneNumber")
     .sort({ createdAt: -1 });
 
@@ -161,7 +161,7 @@ export const ArtisanMarkJobCompleted = async (jobId, artisanId) => {
       artisanId,
     },
     { status: "completed", completedAt: new Date() },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!updatedJob) {
@@ -187,7 +187,7 @@ export const ArtisanStartJob = async (jobId, artisanId) => {
       artisanId,
     },
     { status: "in_progress" },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   if (!updatedJob) {

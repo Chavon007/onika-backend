@@ -14,24 +14,17 @@ import {
 } from "../controller/jobController.js";
 const router = express.Router();
 
-router.post(
-  "/post-job",
-  authMiddleware,
-  createJobValidator,
-  validate,
-  createNewJob,
-);
 router.get("/jobs/pending", authMiddleware, matchJob);
+router.get("/jobs/active", authMiddleware, artisanActiveJobController); // moved up
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
 router.patch("/jobs/:jobId/reject", authMiddleware, rejectJobController);
-router.get("/jobs/active", authMiddleware, artisanActiveJobController);
-router.post(
+router.patch(
   "/jobs/:jobId/complete",
   authMiddleware,
   artisanMarkJobCompletedController,
 );
-router.post(
+router.patch(
   "/jobs/:jobId/in-progress",
   authMiddleware,
   artisanStartJobController,
