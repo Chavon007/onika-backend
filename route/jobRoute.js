@@ -14,6 +14,7 @@ import {
 } from "../controller/jobController.js";
 const router = express.Router();
 
+router.post("/post-job", authMiddleware, createNewJob);
 router.get("/jobs/pending", authMiddleware, matchJob);
 router.get("/jobs/active", authMiddleware, artisanActiveJobController); // moved up
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
