@@ -11,12 +11,18 @@ import {
   artisanActiveJobController,
   artisanMarkJobCompletedController,
   artisanStartJobController,
+  customerActiveJobController,
 } from "../controller/jobController.js";
 const router = express.Router();
 
 router.post("/post-job", authMiddleware, createNewJob);
 router.get("/jobs/pending", authMiddleware, matchJob);
-router.get("/jobs/active", authMiddleware, artisanActiveJobController); // moved up
+router.get(
+  "/jobs/customer-active",
+  authMiddleware,
+  customerActiveJobController,
+);
+router.get("/jobs/artisan-active", authMiddleware, artisanActiveJobController);
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
 router.patch("/jobs/:jobId/reject", authMiddleware, rejectJobController);

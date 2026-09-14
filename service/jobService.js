@@ -160,7 +160,7 @@ export const ArtisanMarkJobCompleted = async (jobId, artisanId) => {
       status: "in_progress",
       artisanId,
     },
-    { status: "completed", completedAt: new Date() },
+    { status: "awaiting_confirmation", completedAt: new Date() },
     { returnDocument: "after" },
   );
 
@@ -195,4 +195,26 @@ export const ArtisanStartJob = async (jobId, artisanId) => {
   }
 
   return { job: updatedJob, forbidden: false, notFound: false };
+};
+
+// let's customer get live update on a job they post
+
+export const CustomerActiveJob = async (customerId) => {
+  const activeJobs = await jobModel
+    .find({
+      customerId,
+      status: {
+        $in: [
+          "pending",
+          "in_progress",
+          "accepted",
+          "awaiting_confirmation",
+          "completed",
+        ],
+      },
+    })
+    .populate("artisanId", "fullName phoneNumber")
+    .sort({ createdAt: -1 });
+
+  return { jobs: activeJobs };
 };
