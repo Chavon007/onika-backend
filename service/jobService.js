@@ -218,3 +218,44 @@ export const CustomerActiveJob = async (customerId) => {
 
   return { jobs: activeJobs };
 };
+
+export const customerRaiseDispute = async (jobId, customerId) => {
+  const job = await jobModel.findById(jobId);
+
+  if (!job) {
+    return { job: null, forbidden: false, notFound: true };
+  }
+
+  if (job.customerId.toString() !== customerId) {
+    return { job: null, forbidden: true, notFound: false };
+  }
+
+  const dispute = await jobModel.findOneAndUpdate(
+    {
+      _id: jobId,
+      $or: [
+        { status: "in_progress" },
+        {
+          status: "completed",
+          escrowStatus: "pending_release",
+          autoReleaseAt: { $gt: new Date() },
+        },
+      ],
+    },
+    {
+      $set: {
+        previousStatus: job.status,
+        status: "disputed",
+        escrowStatus: "frozen",
+        disputeRaisedAt: new Date(),
+        autoReleaseAt: null,
+      },
+    },
+    { returnDocument: "after" },
+  );
+  if (!dispute) {
+    return { job: null, forbidden: false, notFound: false };
+  }
+
+  return { job: dispute, forbidden: false, notFound: false };
+};

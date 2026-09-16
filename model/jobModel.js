@@ -47,15 +47,29 @@ const JobSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
+    previousStatus: {
+      type: String,
+      enum: [
+        "pending",
+        "accepted",
+        "in_progress",
+        "awaiting_confirmation",
+        "completed",
+        "disputed",
+        "cancelled",
+      ],
+      default: null,
+    },
     escrowStatus: {
       type: String,
-      enum: ["held", "released", "refunded"],
+      enum: ["held", "pending_release", "released", "refunded", "frozen"],
       default: "held",
     },
     completedAt: {
       type: Date,
       default: null,
     },
+    releasedAt: { type: Date, default: null },
     city: {
       type: String,
       required: true,
@@ -72,6 +86,10 @@ const JobSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    cancelledAt: {
+      type: Date,
+      default: null,
+    },
     disputeResolvedAt: {
       type: Date,
       default: null,
@@ -85,6 +103,10 @@ const JobSchema = new mongoose.Schema(
       required: true,
     },
     state: {
+      type: String,
+      required: true,
+    },
+    disputeReason: {
       type: String,
       required: true,
     },
@@ -112,4 +134,5 @@ const JobSchema = new mongoose.Schema(
   },
 );
 
+JobSchema.index({ escrowStatus: 1, autoReleaseAt: 1 });
 export default mongoose.model("job", JobSchema);
