@@ -219,22 +219,28 @@ export const CustomerActiveJob = async (customerId) => {
   return { jobs: activeJobs };
 };
 
-export const customerRaiseDispute = async (jobId, customerId) => {
+export const CustomerRaiseDispute = async (
+  jobId,
+  customerId,
+  disputeReason,
+) => {
   const job = await jobModel.findById(jobId);
 
   if (!job) {
-    return { job: null, forbidden: false, notFound: true };
+    return { job: null, forbidden: false, notFound: true, invalidState: false };
   }
 
   if (job.customerId.toString() !== customerId) {
-    return { job: null, forbidden: true, notFound: false };
+    return { job: null, forbidden: true, notFound: false, invalidState: false };
   }
 
   const dispute = await jobModel.findOneAndUpdate(
     {
       _id: jobId,
       $or: [
+        { status: "accepted" },
         { status: "in_progress" },
+        { status: "awaiting_confirmation" },
         {
           status: "completed",
           escrowStatus: "pending_release",
@@ -247,6 +253,7 @@ export const customerRaiseDispute = async (jobId, customerId) => {
         previousStatus: job.status,
         status: "disputed",
         escrowStatus: "frozen",
+        disputeReason,
         disputeRaisedAt: new Date(),
         autoReleaseAt: null,
       },
@@ -254,8 +261,13 @@ export const customerRaiseDispute = async (jobId, customerId) => {
     { returnDocument: "after" },
   );
   if (!dispute) {
-    return { job: null, forbidden: false, notFound: false };
+    return { job: null, forbidden: false, notFound: false, invalidState: true };
   }
 
-  return { job: dispute, forbidden: false, notFound: false };
+  return {
+    job: dispute,
+    forbidden: false,
+    notFound: false,
+    invalidState: false,
+  };
 };

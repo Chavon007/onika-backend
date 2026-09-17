@@ -108,7 +108,7 @@ const JobSchema = new mongoose.Schema(
     },
     disputeReason: {
       type: String,
-      required: true,
+      default: null,
     },
     landmark: {
       type: String,

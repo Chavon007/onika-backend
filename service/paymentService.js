@@ -1,23 +1,19 @@
-import jobModel from "../model/jobModel.js";
-
 export const customerReleasePayment = async (jobId, customerId) => {
   const now = new Date();
   const job = await jobModel.findById(jobId);
 
   if (!job) {
-    return { job: null, forbidden: false, notFound: true };
+    return { job: null, forbidden: false, notFound: true, invalidState: false };
   }
 
   if (job.customerId.toString() !== customerId) {
-    return {
-      job: null,
-      forbidden: true,
-      notFound: false,
-    };
+    return { job: null, forbidden: true, notFound: false, invalidState: false };
   }
+
   if (job.status !== "awaiting_confirmation" || job.escrowStatus !== "held") {
-    return { job: null, forbidden: false, notFound: false };
+    return { job: null, forbidden: false, notFound: false, invalidState: true };
   }
+
   const releasePayment = await jobModel.findOneAndUpdate(
     { _id: jobId, status: "awaiting_confirmation", escrowStatus: "held" },
     {
@@ -32,8 +28,8 @@ export const customerReleasePayment = async (jobId, customerId) => {
   );
 
   if (!releasePayment) {
-    return { job: null, forbidden: false, notFound: true };
+    return { job: null, forbidden: false, notFound: false, invalidState: true };
   }
 
-  return { job: releasePayment, forbidden: false, notFound: false };
+  return { job: releasePayment, forbidden: false, notFound: false, invalidState: false };
 };
