@@ -160,7 +160,7 @@ export const ArtisanMarkJobCompleted = async (jobId, artisanId) => {
       status: "in_progress",
       artisanId,
     },
-    { status: "completed", completedAt: new Date() },
+    { status: "awaiting_confirmation", completedAt: new Date() },
     { returnDocument: "after" },
   );
 
@@ -195,4 +195,79 @@ export const ArtisanStartJob = async (jobId, artisanId) => {
   }
 
   return { job: updatedJob, forbidden: false, notFound: false };
+};
+
+// let's customer get live update on a job they post
+
+export const CustomerActiveJob = async (customerId) => {
+  const activeJobs = await jobModel
+    .find({
+      customerId,
+      status: {
+        $in: [
+          "pending",
+          "in_progress",
+          "accepted",
+          "awaiting_confirmation",
+          "completed",
+        ],
+      },
+    })
+    .populate("artisanId", "fullName phoneNumber")
+    .sort({ createdAt: -1 });
+
+  return { jobs: activeJobs };
+};
+
+export const CustomerRaiseDispute = async (
+  jobId,
+  customerId,
+  disputeReason,
+) => {
+  const job = await jobModel.findById(jobId);
+
+  if (!job) {
+    return { job: null, forbidden: false, notFound: true, invalidState: false };
+  }
+
+  if (job.customerId.toString() !== customerId) {
+    return { job: null, forbidden: true, notFound: false, invalidState: false };
+  }
+
+  const dispute = await jobModel.findOneAndUpdate(
+    {
+      _id: jobId,
+      $or: [
+        { status: "accepted" },
+        { status: "in_progress" },
+        { status: "awaiting_confirmation" },
+        {
+          status: "completed",
+          escrowStatus: "pending_release",
+          autoReleaseAt: { $gt: new Date() },
+        },
+      ],
+    },
+    {
+      $set: {
+        previousStatus: job.status,
+        status: "disputed",
+        escrowStatus: "frozen",
+        disputeReason,
+        disputeRaisedAt: new Date(),
+        autoReleaseAt: null,
+      },
+    },
+    { returnDocument: "after" },
+  );
+  if (!dispute) {
+    return { job: null, forbidden: false, notFound: false, invalidState: true };
+  }
+
+  return {
+    job: dispute,
+    forbidden: false,
+    notFound: false,
+    invalidState: false,
+  };
 };

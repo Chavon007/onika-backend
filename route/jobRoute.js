@@ -1,6 +1,9 @@
 import express from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { createJobValidator } from "../validation/jobValidation.js";
+import {
+  createJobValidator,
+  disputeValidator,
+} from "../validation/jobValidation.js";
 import { validate } from "../middleware/validation.js";
 import {
   createNewJob,
@@ -11,12 +14,25 @@ import {
   artisanActiveJobController,
   artisanMarkJobCompletedController,
   artisanStartJobController,
+  customerActiveJobController,
+  customerRaiseDisputeController,
 } from "../controller/jobController.js";
 const router = express.Router();
 
-router.post("/post-job", authMiddleware, createNewJob);
+router.post(
+  "/post-job",
+  authMiddleware,
+  createJobValidator,
+  validate,
+  createNewJob,
+);
 router.get("/jobs/pending", authMiddleware, matchJob);
-router.get("/jobs/active", authMiddleware, artisanActiveJobController); // moved up
+router.get(
+  "/jobs/customer-active",
+  authMiddleware,
+  customerActiveJobController,
+);
+router.get("/jobs/artisan-active", authMiddleware, artisanActiveJobController);
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
 router.patch("/jobs/:jobId/reject", authMiddleware, rejectJobController);
@@ -29,5 +45,12 @@ router.patch(
   "/jobs/:jobId/in-progress",
   authMiddleware,
   artisanStartJobController,
+);
+router.post(
+  "/jobs/:jobId/dispute",
+  authMiddleware,
+  disputeValidator,
+  validate,
+  customerRaiseDisputeController,
 );
 export default router;

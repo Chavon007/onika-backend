@@ -64,3 +64,12 @@ export const createJobValidator = [
     .isURL()
     .withMessage("Each image must be a valid URL"),
 ];
+
+export const disputeValidator = [
+  body("disputeReason")
+    .trim()
+    .notEmpty()
+    .withMessage("Dispute reason can't be empty")
+    .isLength({ min: 10 })
+    .withMessage("Your reason must be at least ten characters "),
+];

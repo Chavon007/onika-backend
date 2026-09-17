@@ -7,6 +7,8 @@ import {
   ArtisanActiveJob,
   ArtisanMarkJobCompleted,
   ArtisanStartJob,
+  CustomerActiveJob,
+  CustomerRaiseDispute,
 } from "../service/jobService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
@@ -353,6 +355,91 @@ export const artisanMarkJobCompletedController = async (req, res) => {
     res
       .status(200)
       .json({ success: true, message: "job marked as completed", data: job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Returns all active jobs of a customer(their active work).
+export const customerActiveJobController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only customers can make this request",
+      });
+    }
+
+    const { jobs } = await CustomerActiveJob(userId);
+
+    res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const customerRaiseDisputeController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { disputeReason } = req.body;
+    const { jobId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Invalid job ID" });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only a customer can make  this request",
+      });
+    }
+
+    if (!disputeReason) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Please add what happend" });
+    }
+    const { job, forbidden, notFound, invalidState } =
+      await CustomerRaiseDispute(jobId, userId, disputeReason);
+
+    if (notFound) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+    if (forbidden) {
+      return res
+        .status(403)
+        .json({ success: false, message: "You can't make this request" });
+    }
+
+    if (invalidState) {
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message: "This job is no longer eligible for a dispute",
+        });
+    }
+    res
+      .status(200)
+      .json({ success: true, message: "Dispute raised successfully", job });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
