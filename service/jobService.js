@@ -309,3 +309,12 @@ export const CustomerCancelJob = async (jobId, customerId) => {
     invalidState: false,
   };
 };
+
+export const CustomerJobHistory = async (customerId) => {
+  const history = await jobModel
+    .find({ customerId })
+    .populate("artisanId", "fullName phoneNumber")
+    .sort({ createdAt: -1 });
+
+  return { jobs: history, notFound: history.length === 0 };
+};

@@ -17,6 +17,7 @@ import {
   customerActiveJobController,
   customerRaiseDisputeController,
   customerCancelJobController,
+  customerJobHistoryController,
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.post(
   validate,
   createNewJob,
 );
+router.get("/jobs/history", authMiddleware, customerJobHistoryController);
 router.get("/jobs/pending", authMiddleware, matchJob);
 router.get(
   "/jobs/customer-active",
@@ -59,4 +61,5 @@ router.patch(
   authMiddleware,
   customerCancelJobController,
 );
+
 export default router;
