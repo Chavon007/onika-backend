@@ -271,3 +271,41 @@ export const CustomerRaiseDispute = async (
     invalidState: false,
   };
 };
+
+export const CustomerCancelJob = async (jobId, customerId) => {
+  const job = await jobModel.findById(jobId);
+
+  if (!job) {
+    return { job: null, forbidden: false, notFound: true, invalidState: false };
+  }
+
+  if (job.customerId.toString() !== customerId) {
+    return { job: null, forbidden: true, notFound: false, invalidState: false };
+  }
+
+  const updatedJob = await jobModel.findOneAndUpdate(
+    {
+      _id: jobId,
+      status: { $in: ["pending", "accepted"] },
+    },
+    {
+      $set: {
+        previousStatus: job.status,
+        status: "cancelled",
+        cancelledAt: new Date(),
+      },
+    },
+    { returnDocument: "after" },
+  );
+
+  if (!updatedJob) {
+    return { job: null, forbidden: false, notFound: false, invalidState: true };
+  }
+
+  return {
+    job: updatedJob,
+    forbidden: false,
+    notFound: false,
+    invalidState: false,
+  };
+};

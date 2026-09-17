@@ -16,6 +16,7 @@ import {
   artisanStartJobController,
   customerActiveJobController,
   customerRaiseDisputeController,
+  customerCancelJobController,
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -46,11 +47,16 @@ router.patch(
   authMiddleware,
   artisanStartJobController,
 );
-router.post(
+router.patch(
   "/jobs/:jobId/dispute",
   authMiddleware,
   disputeValidator,
   validate,
   customerRaiseDisputeController,
+);
+router.patch(
+  "/jobs/:jobId/cancel",
+  authMiddleware,
+  customerCancelJobController,
 );
 export default router;
