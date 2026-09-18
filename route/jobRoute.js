@@ -18,6 +18,7 @@ import {
   customerRaiseDisputeController,
   customerCancelJobController,
   customerJobHistoryController,
+ 
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -35,6 +36,7 @@ router.get(
   authMiddleware,
   customerActiveJobController,
 );
+
 router.get("/jobs/artisan-active", authMiddleware, artisanActiveJobController);
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
