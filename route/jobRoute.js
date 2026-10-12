@@ -16,6 +16,9 @@ import {
   artisanStartJobController,
   customerActiveJobController,
   customerRaiseDisputeController,
+  customerCancelJobController,
+  customerJobHistoryController,
+ 
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -26,12 +29,14 @@ router.post(
   validate,
   createNewJob,
 );
+router.get("/jobs/history", authMiddleware, customerJobHistoryController);
 router.get("/jobs/pending", authMiddleware, matchJob);
 router.get(
   "/jobs/customer-active",
   authMiddleware,
   customerActiveJobController,
 );
+
 router.get("/jobs/artisan-active", authMiddleware, artisanActiveJobController);
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
@@ -46,11 +51,17 @@ router.patch(
   authMiddleware,
   artisanStartJobController,
 );
-router.post(
+router.patch(
   "/jobs/:jobId/dispute",
   authMiddleware,
   disputeValidator,
   validate,
   customerRaiseDisputeController,
 );
+router.patch(
+  "/jobs/:jobId/cancel",
+  authMiddleware,
+  customerCancelJobController,
+);
+
 export default router;

@@ -9,10 +9,13 @@ import {
   ArtisanStartJob,
   CustomerActiveJob,
   CustomerRaiseDispute,
+  CustomerCancelJob,
+  CustomerJobHistory,
 } from "../service/jobService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
 import artisanProfileModel from "../model/artisanProfileModel.js";
+import jobModel from "../model/jobModel.js";
 
 // Creates a new job posting. Only customers are allowed to post jobs.
 export const createNewJob = async (req, res) => {
@@ -430,12 +433,10 @@ export const customerRaiseDisputeController = async (req, res) => {
     }
 
     if (invalidState) {
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "This job is no longer eligible for a dispute",
-        });
+      return res.status(409).json({
+        success: false,
+        message: "This job is no longer eligible for a dispute",
+      });
     }
     res
       .status(200)
@@ -444,3 +445,87 @@ export const customerRaiseDisputeController = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const customerCancelJobController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res.status(404).json({ success: "Invalid job ID" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+    if (user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only a customer can make this request",
+      });
+    }
+
+    const { job, forbidden, notfound, invalidState } = await CustomerCancelJob(
+      jobId,
+      userId,
+    );
+
+    if (notfound) {
+      return res.status(404).json({ success: false, message: "Job not found" });
+    }
+    if (forbidden) {
+      return res
+        .status(403)
+        .json({ succcesS: false, message: "You can't make this request" });
+    }
+    if (invalidState) {
+      return res.status(409).josn({
+        success: false,
+        message: "This job can no longer be cancelled",
+      });
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Job has beeen cancelled", job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const customerJobHistoryController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only a customer can make this request",
+      });
+    }
+
+    const { jobs, notFound } = await CustomerJobHistory(userId);
+    if (notFound) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No job history yet" });
+    }
+
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
