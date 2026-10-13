@@ -66,7 +66,7 @@ export const getAllArtisan = async () => {
   const allArtisan = await artisanProfileModel
     .find({ verificationStatus: "verified" })
     .select("-nin -bvn -governmentId  -verificationDetails")
-    .populate("artisanId", "fullName phoneNumber lga state")
+    .populate("User", "fullName phoneNumber lga state")
     .sort({ createdAt: -1 });
 
   return { allArtisan, notFound: allArtisan.length === 0 };

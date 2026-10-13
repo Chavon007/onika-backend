@@ -1,5 +1,6 @@
 import jobModel from "../model/jobModel.js";
-
+import ArtisanProfileSchema from "../model/artisanProfileModel.js";
+import User from "../model/auth.js";
 // Creates a new job posting on behalf of a customer.
 // Takes the raw job fields from the request and saves them to the database.
 export const createJob = async ({
@@ -38,6 +39,7 @@ export const createJob = async ({
 export const findJobsForArtisan = async ({ skills, lga, artisanId }) => {
   const jobs = await jobModel
     .find({
+      typ: "public",
       category: { $in: skills },
       lga,
       status: "pending",
@@ -319,4 +321,30 @@ export const CustomerJobHistory = async (customerId) => {
   return { jobs: history, notFound: history.length === 0 };
 };
 
+export const PrivateJobBooking = async ({
+  customerId,
+  address,
+  price,
+  images,
+  description,
+  date,
+  artisanId,
+}) => {
+  const artisan = await User.findOne({ _id: artisanId, role: "artisan" });
 
+  if (!artisan) {
+    return { job: null, notFound: true };
+  }
+  const job = await jobModel.create({
+    type: "private",
+    customerId,
+    description,
+    price,
+    address,
+    date,
+    images,
+    artisanId,
+  });
+
+  return { job, notFound: false };
+};

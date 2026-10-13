@@ -17,6 +17,6 @@ router.post(
   validate,
   createArtisan,
 );
-router.get("/artisan", authMiddleware, getAllAristanController);
+router.get("/all", authMiddleware, getAllAristanController);
 
 export default router;
