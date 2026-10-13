@@ -62,9 +62,14 @@ export const createArtisanProfile = async (userId, user, payload) => {
   return createArtisan;
 };
 
-export const getAllArtisan = async () => {
+export const getAllArtisan = async ({ skill } = {}) => {
+  const filter = {};
+
+  if (skill) {
+    filter.skills = skill;
+  }
   const allArtisan = await artisanProfileModel
-    .find({ verificationStatus: "verified" })
+    .find({ verificationStatus: "verified", ...filter })
     .select("-nin -bvn -governmentId  -verificationDetails")
     .populate("User", "fullName phoneNumber lga state")
     .sort({ createdAt: -1 });
