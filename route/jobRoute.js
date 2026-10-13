@@ -3,10 +3,12 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 import {
   createJobValidator,
   disputeValidator,
+  createPrivateJob,
 } from "../validation/jobValidation.js";
 import { validate } from "../middleware/validation.js";
 import {
   createNewJob,
+  PrivateJobBookingController,
   matchJob,
   matchJobDetails,
   acceptJobController,
@@ -18,7 +20,6 @@ import {
   customerRaiseDisputeController,
   customerCancelJobController,
   customerJobHistoryController,
- 
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -28,6 +29,13 @@ router.post(
   createJobValidator,
   validate,
   createNewJob,
+);
+router.post(
+  "/private-job",
+  authMiddleware,
+  createPrivateJob,
+  validate,
+  PrivateJobBookingController,
 );
 router.get("/jobs/history", authMiddleware, customerJobHistoryController);
 router.get("/jobs/pending", authMiddleware, matchJob);

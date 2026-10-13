@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 
+const requiredForPublic = function () {
+  return this.type === "public";
+};
 const JobSchema = new mongoose.Schema(
   {
     customerId: {
@@ -14,7 +17,12 @@ const JobSchema = new mongoose.Schema(
     },
     category: {
       type: String,
-      required: true,
+      required: requiredForPublic,
+    },
+    type: {
+      type: String,
+      enum: ["public", "private"],
+      default: "public",
     },
     rejectedBy: {
       type: [mongoose.Schema.Types.ObjectId],
@@ -72,7 +80,7 @@ const JobSchema = new mongoose.Schema(
     releasedAt: { type: Date, default: null },
     city: {
       type: String,
-      required: true,
+      required: requiredForPublic,
     },
     confirmedAt: {
       type: Date,
@@ -86,6 +94,10 @@ const JobSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    date: {
+      type: Date,
+      default: null,
+    },
     cancelledAt: {
       type: Date,
       default: null,
@@ -96,7 +108,7 @@ const JobSchema = new mongoose.Schema(
     },
     lga: {
       type: String,
-      required: true,
+      required: requiredForPublic,
     },
     address: {
       type: String,
@@ -104,7 +116,7 @@ const JobSchema = new mongoose.Schema(
     },
     state: {
       type: String,
-      required: true,
+      required: requiredForPublic,
     },
     disputeReason: {
       type: String,
@@ -112,7 +124,7 @@ const JobSchema = new mongoose.Schema(
     },
     landmark: {
       type: String,
-      required: true,
+      required: requiredForPublic,
     },
     images: {
       type: [String],
@@ -125,7 +137,7 @@ const JobSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      required: true,
+      required: requiredForPublic,
       enum: ["ASAP", "Today", "This week", "Flexible"],
     },
   },

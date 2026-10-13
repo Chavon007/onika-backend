@@ -73,3 +73,45 @@ export const disputeValidator = [
     .isLength({ min: 10 })
     .withMessage("Your reason must be at least ten characters "),
 ];
+
+export const createPrivateJob = [
+  body("artisanId")
+    .notEmpty()
+    .withMessage("Artian is required")
+    .isMongoId()
+    .withMessage("Invalid artisan ID"),
+  body("date")
+    .notEmpty()
+    .withMessage("Please pick a date you want the job to be done")
+    .isISO8601()
+    .withMessage("Invalid date")
+    .custom((value) => new Date(value) > new Date())
+    .withMessage("Date must be in the future"),
+  body("address")
+    .trim()
+    .notEmpty()
+    .withMessage("Please put your address")
+    .isLength({ min: 10 })
+    .withMessage("Address must be at least 10 characters long"),
+  body("description")
+    .trim()
+    .notEmpty()
+    .withMessage("Job description can not be empty")
+    .isLength({ min: 10 })
+    .withMessage("Job description must be at least 10 characters long"),
+  body("price")
+    .trim()
+    .notEmpty()
+    .withMessage("Price can not empty")
+    .isFloat({ min: 0 })
+    .withMessage("Price must be a positive number"),
+  body("images")
+    .isArray({ min: 3, max: 6 })
+    .withMessage("Please upload between 3 and 6 images"),
+  body("images.*")
+    .isString()
+    .trim()
+    .notEmpty()
+    .isURL()
+    .withMessage("Each image must be a valid URL"),
+];
