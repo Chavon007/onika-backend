@@ -1,4 +1,7 @@
-import { createArtisanProfile, getAllArtisan } from "../service/artisanProfileService.js";
+import {
+  createArtisanProfile,
+  getAllArtisan,
+} from "../service/artisanProfileService.js";
 import User from "../model/auth.js";
 
 export const createArtisan = async (req, res) => {
@@ -26,10 +29,12 @@ export const createArtisan = async (req, res) => {
 export const getAllAristanController = async (req, res) => {
   try {
     const userId = req.user.id;
-
+    const { skill } = req.query;
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User does not exist" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
     }
     if (user.role !== "customer") {
       return res.status(403).json({
@@ -38,11 +43,7 @@ export const getAllAristanController = async (req, res) => {
       });
     }
 
-    const { allArtisan, notFound } = await getAllArtisan();
-    if (notFound) {
-      return res.status(404).json({ success: false, message: "No artisan found" });
-    }
-
+    const { allArtisan } = await getAllArtisan(skill);
     res.status(200).json({ success: true, data: allArtisan });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
