@@ -13,6 +13,7 @@ import {
   CustomerJobHistory,
   PrivateJobBooking,
   fetchArtisanPrivateBookings,
+  privateJobBookingDetails,
 } from "../service/jobService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
@@ -585,6 +586,52 @@ export const fetchArtisanPrivateBookingsController = async (req, res) => {
 
     const { jobs } = await fetchArtisanPrivateBookings(user._id);
     res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const privateJobBookingDetailsController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+    if (user.role !== "artisan") {
+      return res.status(403).json({
+        success: false,
+        message: "Only artisan can make this request",
+      });
+    }
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid job id" });
+    }
+    const { job, notFound, forbidden } = await privateJobBookingDetails(
+      jobId,
+      user._id,
+    );
+
+    if (notFound) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Job does not exist" });
+    }
+
+    if (forbidden) {
+      return res
+        .status(403)
+        .json({ success: false, message: "You are not assigned" });
+    }
+
+    res.status(200).json({ success: true, data: job });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

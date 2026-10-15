@@ -357,3 +357,23 @@ export const fetchArtisanPrivateBookings = async (artisanId) => {
 
   return { jobs: bookings };
 };
+
+export const privateJobBookingDetails = async (jobId, artisanId) => {
+  const job = await jobModel
+    .findById(jobId)
+    .populate("customerId", "fullName phoneNumber");
+
+  if (!job) {
+    return { job: null, forbidden: false, notFound: true };
+  }
+
+  if (
+    job.type !== "private" ||
+    !job.artisanId ||
+    job.artisanId.toString() !== artisanId.toString()
+  ) {
+    return { job: null, notFound: false, forbidden: true };
+  }
+
+  return { job, notFound: false, forbidden: false };
+};
