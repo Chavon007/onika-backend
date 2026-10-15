@@ -348,3 +348,12 @@ export const PrivateJobBooking = async ({
 
   return { job, notFound: false };
 };
+
+export const fetchArtisanPrivateBookings = async (artisanId) => {
+  const bookings = await jobModel
+    .find({ artisanId, type: "private" })
+    .populate("customerId", "fullName phoneNumber")
+    .sort({ createdAt: -1 });
+
+  return { jobs: bookings };
+};
