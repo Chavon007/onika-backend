@@ -43,7 +43,7 @@ export const getAllAristanController = async (req, res) => {
       });
     }
 
-    const { allArtisan } = await getAllArtisan(skill);
+    const { allArtisan } = await getAllArtisan({skill});
     res.status(200).json({ success: true, data: allArtisan });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
