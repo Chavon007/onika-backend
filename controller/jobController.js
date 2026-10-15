@@ -12,6 +12,7 @@ import {
   CustomerCancelJob,
   CustomerJobHistory,
   PrivateJobBooking,
+  fetchArtisanPrivateBookings,
 } from "../service/jobService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
@@ -559,6 +560,31 @@ export const PrivateJobBookingController = async (req, res) => {
     res
       .status(201)
       .json({ success: true, message: "Job sent to the artisan", data: job });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const fetchArtisanPrivateBookingsController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "artisan") {
+      return res.status(403).json({
+        success: false,
+        message: "Only Artisan can make this request",
+      });
+    }
+
+    const { jobs } = await fetchArtisanPrivateBookings(user._id);
+    res.status(200).json({ success: true, data: jobs });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
