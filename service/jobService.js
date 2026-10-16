@@ -377,3 +377,80 @@ export const privateJobBookingDetails = async (jobId, artisanId) => {
 
   return { job, notFound: false, forbidden: false };
 };
+
+export const rejectPrivateJobBooking = async (jobId, artisanId, status) => {
+  const job = await jobModel
+    .findById(jobId)
+    .populate("customerId", "fullName phoneNumber");
+
+  if (!job) {
+    return { job: null, forbidden: false, notFound: true, invalidState: false };
+  }
+
+  if (
+    job.type !== "private" ||
+    !job.artisanId ||
+    job.artisanId.toString() !== artisanId.toString()
+  ) {
+    return { job: null, forbidden: true, notFound: false, invalidState: false };
+  }
+
+  const updateJob = await jobModel.findByIdAndUpdate(
+    {
+      _id: jobId,
+      status: "pending",
+    },
+    {
+      status: "rejected",
+    },
+    { returnDocument: "after" },
+  );
+
+  if (!updateJob) {
+    return { job: null, notFound: false, forbidden: false, invalidState: true };
+  }
+
+  return {
+    job: updateJob,
+    notFound: false,
+    forbidden: false,
+    invalidState: false,
+  };
+};
+
+export const acceptPrivateJobBooking = async (jobId, artisanId) => {
+  const job = await jobModel.findById(jobId);
+
+  if (!job) {
+    return { job: null, notFound: true, forbidden: false, invalidState: false };
+  }
+  if (
+    job.type !== "private" ||
+    !job.artisanId ||
+    job.artisanId.toString() !== artisanId.toString()
+  ) {
+    return { job: null, notFound: false, forbidden: true, invalidState: false };
+  }
+
+  const updateJob = await jobModel.findByIdAndUpdate(
+    {
+      _id: jobId,
+      status: "pending",
+    },
+    {
+      status: "accept",
+    },
+    { returnDocument: "after" },
+  );
+
+  if (updateJob) {
+    return { job: null, notFound: false, forbidden: false, invalidState: true };
+  }
+
+  return {
+    job: updateJob,
+    forbidden: false,
+    notFound: false,
+    invalidState: false,
+  };
+};
