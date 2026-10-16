@@ -48,7 +48,7 @@ const JobSchema = new mongoose.Schema(
         "pending",
         "accepted",
         "in_progress",
-        "reject",
+        "rejected",
         "awaiting_confirmation",
         "completed",
         "disputed",
@@ -149,4 +149,6 @@ const JobSchema = new mongoose.Schema(
 );
 
 JobSchema.index({ escrowStatus: 1, autoReleaseAt: 1 });
+JobSchema.index({ customerId: 1, createdAt: -1 });
+JobSchema.index({ artisanId: 1, type: 1, status: 1 });
 export default mongoose.model("job", JobSchema);
