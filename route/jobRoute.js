@@ -22,6 +22,8 @@ import {
   customerJobHistoryController,
   fetchArtisanPrivateBookingsController,
   privateJobBookingDetailsController,
+  rejectPrivateJobBookingController,
+  acceptPrivateJobBookingController,
 } from "../controller/jobController.js";
 const router = express.Router();
 
@@ -65,6 +67,16 @@ router.patch(
   "/jobs/:jobId/complete",
   authMiddleware,
   artisanMarkJobCompletedController,
+);
+router.patch(
+  "/jobs/private-booking/:jobId/accept",
+  authMiddleware,
+  acceptPrivateJobBookingController,
+);
+router.patch(
+  "/jobs/private-booking/:jobId/reject",
+  authMiddleware,
+  rejectPrivateJobBookingController,
 );
 router.patch(
   "/jobs/:jobId/in-progress",
