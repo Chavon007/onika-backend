@@ -312,13 +312,19 @@ export const CustomerCancelJob = async (jobId, customerId) => {
   };
 };
 
-export const CustomerJobHistory = async (customerId) => {
-  const history = await jobModel
-    .find({ customerId })
-    .populate("artisanId", "fullName phoneNumber")
-    .sort({ createdAt: -1 });
+export const CustomerJobHistory = async (customerId, page = 1, limit = 6) => {
+  const skip = (page - 1) * limit;
 
-  return { jobs: history, notFound: history.length === 0 };
+  const [jobs, total] = await Promise.all([
+    jobModel
+      .find({ customerId })
+      .populate("artisanId", "fullName phoneNumber")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    jobModel.countDocuments({ customerId }),
+  ]);
+  return { jobs, total, totalPages: Math.ceil(total / limit) };
 };
 
 export const PrivateJobBooking = async ({

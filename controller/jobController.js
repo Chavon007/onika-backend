@@ -504,7 +504,8 @@ export const customerCancelJobController = async (req, res) => {
 export const customerJobHistoryController = async (req, res) => {
   try {
     const userId = req.user.id;
-
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(parseInt(req.query.limit) || 6, 30);
     const user = await User.findById(userId);
 
     if (!user) {
@@ -520,15 +521,18 @@ export const customerJobHistoryController = async (req, res) => {
       });
     }
 
-    const { jobs, notFound } = await CustomerJobHistory(userId);
-    if (notFound) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No job history yet" });
-    }
+    const { jobs, total, totalPages } = await CustomerJobHistory(
+      userId,
+      page,
+      limit,
+    );
 
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ success: true, data: jobs });
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: { page, limit, total, totalPages },
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
