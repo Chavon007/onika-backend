@@ -351,7 +351,7 @@ export const PrivateJobBooking = async ({
 
 export const fetchArtisanPrivateBookings = async (artisanId) => {
   const bookings = await jobModel
-    .find({ artisanId, type: "private" })
+    .find({ artisanId, type: "private", status: "pending" })
     .populate("customerId", "fullName phoneNumber")
     .sort({ createdAt: -1 });
 
@@ -395,7 +395,7 @@ export const rejectPrivateJobBooking = async (jobId, artisanId, status) => {
     return { job: null, forbidden: true, notFound: false, invalidState: false };
   }
 
-  const updateJob = await jobModel.findByIdAndUpdate(
+  const updateJob = await jobModel.findOneAndUpdate(
     {
       _id: jobId,
       status: "pending",
@@ -432,18 +432,18 @@ export const acceptPrivateJobBooking = async (jobId, artisanId) => {
     return { job: null, notFound: false, forbidden: true, invalidState: false };
   }
 
-  const updateJob = await jobModel.findByIdAndUpdate(
+  const updateJob = await jobModel.findOneAndUpdate(
     {
       _id: jobId,
       status: "pending",
     },
     {
-      status: "accept",
+      status: "accepted",
     },
     { returnDocument: "after" },
   );
 
-  if (updateJob) {
+  if (!updateJob) {
     return { job: null, notFound: false, forbidden: false, invalidState: true };
   }
 

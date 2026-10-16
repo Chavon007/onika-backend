@@ -62,7 +62,7 @@ const JobSchema = new mongoose.Schema(
         "pending",
         "accepted",
         "in_progress",
-        "reject",
+        "rejected",
         "awaiting_confirmation",
         "completed",
         "disputed",
