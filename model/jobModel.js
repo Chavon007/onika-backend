@@ -3,6 +3,10 @@ import mongoose from "mongoose";
 const requiredForPublic = function () {
   return this.type === "public";
 };
+const isWholeNumber = {
+  validator: Number.isInteger,
+  message: "{PATH} must be a whole number(kobo)",
+};
 const JobSchema = new mongoose.Schema(
   {
     customerId: {
@@ -36,11 +40,13 @@ const JobSchema = new mongoose.Schema(
     price: {
       type: Number,
       required: true,
-      default: null,
+      min: 1,
+      validate: isWholeNumber,
     },
     agreedPrice: {
       type: Number,
       default: null,
+      validate: isWholeNumber,
     },
     status: {
       type: String,
@@ -72,8 +78,15 @@ const JobSchema = new mongoose.Schema(
     },
     escrowStatus: {
       type: String,
-      enum: ["held", "pending_release", "released", "refunded", "frozen"],
-      default: "held",
+      enum: [
+        "held",
+        "pending_release",
+        "released",
+        "refunded",
+        "frozen",
+        "none",
+      ],
+      default: "none",
     },
     completedAt: {
       type: Date,
