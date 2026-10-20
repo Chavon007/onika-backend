@@ -1,5 +1,10 @@
 import walletModel from "../model/walletModel.js";
 import transactionModel from "../model/transactionModel.js";
+import mongoose from "mongoose";
+
+// Creates a wallet for a user with a zero balance.
+// If the user already has a wallet, it returns the existing one instead,
+// and the created flag tells the caller which case happened.
 export const createWallet = async (userId, session = null) => {
   const existing = await walletModel.findOne({ User: userId }).session(session);
   if (existing) {
@@ -10,7 +15,9 @@ export const createWallet = async (userId, session = null) => {
   return { wallet, created: true };
 };
 
-export const getWallet = async (userId, session) => {
+// Finds a user's wallet by their user ID.
+// Returns notFound: true when the user has no wallet yet.
+export const getWallet = async (userId, session = null) => {
   const wallet = await walletModel.findOne({ User: userId }).session(session);
   if (!wallet) {
     return { wallet: null, notFound: true };
@@ -19,6 +26,9 @@ export const getWallet = async (userId, session) => {
   return { wallet, notFound: false };
 };
 
+// Adds money to a user's wallet and records it in the ledger.
+// A reference that was already processed returns the original transaction
+// without crediting again. Internal use only, never expose as an endpoint.
 export const creditWallet = async (
   userId,
   amount,
@@ -33,7 +43,6 @@ export const creditWallet = async (
     throw new Error("Amount must be a whole number of at least 1 kobo");
   }
 
-  // Already processed? Return it instead of crediting twice
   const existing = await transactionModel
     .findOne({ reference })
     .session(session);
@@ -42,7 +51,6 @@ export const creditWallet = async (
     return { wallet: null, transaction: existing, duplicate: true };
   }
 
-  // Atomic update: no read-then-save
   const wallet = await walletModel.findOneAndUpdate(
     {
       User: userId,
@@ -77,6 +85,10 @@ export const creditWallet = async (
   return { wallet, transaction, duplicate: false };
 };
 
+// Removes money from a user's wallet and records it in the ledger.
+// The deduction only happens if the wallet is active and has enough balance,
+// and a repeated reference returns the original transaction without debiting again.
+// Internal use only, never expose as an endpoint.
 export const debitWallet = async (
   userId,
   amount,
@@ -117,6 +129,7 @@ export const debitWallet = async (
     if (found.status !== "active") throw new Error("Wallet is frozen");
     throw new Error("Insufficient balance");
   }
+
   const [transaction] = await transactionModel.create(
     [
       {
@@ -139,6 +152,8 @@ export const debitWallet = async (
   return { wallet, transaction, duplicate: false };
 };
 
+// Returns a user's transaction history, newest first, one page at a time.
+// Provider metadata is left out so users only see their own safe fields.
 export const getTransactions = async (userId, page = 1, limit = 6) => {
   const skip = (page - 1) * limit;
 
@@ -154,4 +169,23 @@ export const getTransactions = async (userId, page = 1, limit = 6) => {
   ]);
 
   return { transactions, total, totalpage: Math.ceil(total / limit) };
+};
+
+// Returns a single transaction by ID, but only if it belongs to the given user.
+// A malformed ID or someone else's transaction both come back as notFound.
+export const getTransaction = async (userId, transactionId) => {
+  if (!mongoose.isValidObjectId(transactionId)) {
+    return { transaction: null, notFound: true };
+  }
+
+  const transaction = await transactionModel
+    .findOne({ _id: transactionId, User: userId })
+    .select("-metadata -__v")
+    .lean();
+
+  if (!transaction) {
+    return { transaction: null, notFound: true };
+  }
+
+  return { transaction, notFound: false };
 };
