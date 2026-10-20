@@ -16,12 +16,30 @@ const escrowSchema = new mongoose.Schema(
     artisanId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
     amount: {
       type: Number,
       required: true,
       min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "Amount must be in kobo",
+      },
+    },
+    commissionAmount: {
+      type: Number,
+      default: null,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: "Amount must be in kobo",
+      },
+    },
+    artisanAmount: {
+      type: Number,
+      default: null,
+      min: 0,
       validate: {
         validator: Number.isInteger,
         message: "Amount must be in kobo",

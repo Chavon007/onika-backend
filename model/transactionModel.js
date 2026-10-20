@@ -49,6 +49,7 @@ const transactionSchema = new mongoose.Schema(
         "escrow_release",
         "refund",
         "withdrawal",
+        "commission",
       ],
       required: true,
     },
