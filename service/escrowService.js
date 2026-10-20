@@ -1,10 +1,8 @@
-import escrowModel from "../model/escrowModel";
-import jobModel from "../model/jobModel";
-import { debitWallet } from "./walletService";
-import { creditWallet } from "./walletService";
-import transactionModel from "../model/transactionModel";
-import walletModel from "../model/walletModel";
-import mongoose from "mongoose";
+import escrowModel from "../model/escrowModel.js";
+import jobModel from "../model/jobModel.js";
+import { debitWallet } from "./walletService.js";
+import { creditWallet } from "./walletService.js";
+
 import { COMMISSION_RATE, PLATFORM_USER_ID } from "../config/platform";
 
 // Takes the job price from the customer's wallet and holds it in escrow.
@@ -272,45 +270,21 @@ export const refundEscrow = async (jobId, session) => {
   return { escrow, notFound: false, notCompleted: false, notHeld: false };
 };
 
-// Pauses a held escrow when a dispute is raised, so nothing can be released
-// until an admin decides. No money moves.
-// Only works while the escrow is held and the job is accepted, in progress or
-// awaiting confirmation. Runs inside the caller's session so the escrow update
-// and the job update save together or not at all.
+// Pauses a held escrow when a dispute is raised. No money moves.
+// The job-level dispute function already checks the job state.
 export const freezeEscrow = async (jobId, session) => {
   if (!session) throw new Error("A database session is required");
 
-  const job = await jobModel.findById(jobId).session(session);
-
-  if (!job) {
-    return { escrow: null, notFound: true, notHeld: false, notAllowed: false };
-  }
-
-  if (
-    !["accepted", "in_progress", "awaiting_confirmation"].includes(job.status)
-  ) {
-    return { escrow: null, notFound: false, notAllowed: true, notHeld: false };
-  }
-
   const escrow = await escrowModel.findOneAndUpdate(
-    {
-      jobId,
-      status: "held",
-    },
+    { jobId, status: "held" },
     { $set: { status: "frozen" } },
     { new: true, session },
   );
+
   if (!escrow) {
     const found = await escrowModel.findOne({ jobId }).session(session);
-    if (!found) {
-      return {
-        escrow: null,
-        notFound: true,
-        notAllowed: false,
-        notHeld: false,
-      };
-    }
-    return { escrow: found, notFound: false, notAllowed: false, notHeld: true };
+    if (!found) return { escrow: null, notFound: true, notHeld: false };
+    return { escrow: found, notFound: false, notHeld: true };
   }
 
   await jobModel.updateOne(
@@ -319,5 +293,5 @@ export const freezeEscrow = async (jobId, session) => {
     { session },
   );
 
-  return { escrow, notFound: false, notAllowed: false, notHeld: false };
+  return { escrow, notFound: false, notHeld: false };
 };

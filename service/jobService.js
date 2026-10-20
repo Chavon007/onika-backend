@@ -1,6 +1,8 @@
 import jobModel from "../model/jobModel.js";
 import ArtisanProfileSchema from "../model/artisanProfileModel.js";
 import User from "../model/auth.js";
+
+const AUTO_RELEASE_MS = 48 * 60 * 60 * 1000;
 // Creates a new job posting on behalf of a customer.
 // Takes the raw job fields from the request and saves them to the database.
 export const createJob = async ({
@@ -15,20 +17,26 @@ export const createJob = async ({
   images,
   priority,
   city,
+  session = null,
 }) => {
-  const newjob = await jobModel.create({
-    customerId,
-    category,
-    description,
-    price,
-    state,
-    address,
-    city,
-    landmark,
-    lga,
-    images,
-    priority,
-  });
+  const [newjob] = await jobModel.create(
+    [
+      {
+        customerId,
+        category,
+        description,
+        price,
+        state,
+        address,
+        city,
+        landmark,
+        lga,
+        images,
+        priority,
+      },
+    ],
+    { session },
+  );
 
   return newjob;
 };
@@ -74,20 +82,18 @@ export const findJobsForArtisanDetails = async (jobId, skills, artisanId) => {
   return { job, forbidden: false };
 };
 
-// Lets an artisan accept a pending job.
-// Uses an atomic findOneAndUpdate (status: "pending", artisanId: null as the
-// filter) so that if two artisans accept at the same time, only one write
-// succeeds — the loser gets alreadyTaken: true instead of silently
-// overwriting the winner. This is the race-condition fix.
-export const ArtisanAcceptJob = async (jobId, artisanId, skills) => {
-  const job = await jobModel.findById(jobId);
+// Marks a pending job as accepted by the artisan, if their skills match the
+// job category. The update only matches a job that is still pending and has no
+// artisan, so two artisans accepting at once can't both get it.
+export const ArtisanAcceptJob = async (jobId, artisanId, skills, session) => {
+  const job = await jobModel.findById(jobId).session(session);
 
   if (!job) {
-    return { job: null, forbidden: false, notFound: true };
+    return { job: null, forbidden: false, notFound: true, alreadyTaken: false };
   }
   const isAllowed = skills.includes(job.category);
   if (!isAllowed) {
-    return { job: null, forbidden: true, notFound: false };
+    return { job: null, forbidden: true, notFound: false, alreadyTaken: false };
   }
 
   const updatedJob = await jobModel.findOneAndUpdate(
@@ -97,13 +103,18 @@ export const ArtisanAcceptJob = async (jobId, artisanId, skills) => {
       artisanId: null,
     },
     { status: "accepted", artisanId },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
 
   if (!updatedJob) {
     return { job: null, forbidden: false, notFound: false, alreadyTaken: true };
   }
-  return { job: updatedJob, forbidden: false, notFound: false };
+  return {
+    job: updatedJob,
+    forbidden: false,
+    notFound: false,
+    alreadyTaken: false,
+  };
 };
 
 // Lets an artisan decline a pending job (before ever accepting it).
@@ -151,6 +162,7 @@ export const ArtisanActiveJob = async (artisanId) => {
 // ensures only the assigned artisan can complete it, and only once the
 // job has actually been started — you can't skip straight from
 // "in_progress" to "completed".
+// Marks the job done and starts the 48-hour auto-release timer.
 export const ArtisanMarkJobCompleted = async (jobId, artisanId) => {
   const job = await jobModel.findById(jobId);
   if (!job) {
@@ -162,7 +174,11 @@ export const ArtisanMarkJobCompleted = async (jobId, artisanId) => {
       status: "in_progress",
       artisanId,
     },
-    { status: "awaiting_confirmation", completedAt: new Date() },
+    {
+      status: "awaiting_confirmation",
+      completedAt: new Date(),
+      autoReleaseAt: new Date(Date.now() + AUTO_RELEASE_MS),
+    },
     { returnDocument: "after" },
   );
 
@@ -225,9 +241,9 @@ export const CustomerRaiseDispute = async (
   jobId,
   customerId,
   disputeReason,
+  session,
 ) => {
-  const job = await jobModel.findById(jobId);
-
+  const job = await jobModel.findById(jobId).session(session);
   if (!job) {
     return { job: null, forbidden: false, notFound: true, invalidState: false };
   }
@@ -260,7 +276,7 @@ export const CustomerRaiseDispute = async (
         autoReleaseAt: null,
       },
     },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
   if (!dispute) {
     return { job: null, forbidden: false, notFound: false, invalidState: true };
@@ -274,8 +290,8 @@ export const CustomerRaiseDispute = async (
   };
 };
 
-export const CustomerCancelJob = async (jobId, customerId) => {
-  const job = await jobModel.findById(jobId);
+export const CustomerCancelJob = async (jobId, customerId, session) => {
+  const job = await jobModel.findById(jobId).session(session);
 
   if (!job) {
     return { job: null, forbidden: false, notFound: true, invalidState: false };
@@ -297,7 +313,7 @@ export const CustomerCancelJob = async (jobId, customerId) => {
         cancelledAt: new Date(),
       },
     },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
 
   if (!updatedJob) {
@@ -335,22 +351,31 @@ export const PrivateJobBooking = async ({
   description,
   date,
   artisanId,
+  session = null,
 }) => {
-  const artisan = await User.findOne({ _id: artisanId, role: "artisan" });
+  const artisan = await User.findOne({
+    _id: artisanId,
+    role: "artisan",
+  }).session(session);
 
   if (!artisan) {
     return { job: null, notFound: true };
   }
-  const job = await jobModel.create({
-    type: "private",
-    customerId,
-    description,
-    price,
-    address,
-    date,
-    images,
-    artisanId,
-  });
+  const job = await jobModel.create(
+    [
+      {
+        type: "private",
+        customerId,
+        description,
+        price,
+        address,
+        date,
+        images,
+        artisanId,
+      },
+    ],
+    { session },
+  );
 
   return { job, notFound: false };
 };
@@ -384,10 +409,8 @@ export const privateJobBookingDetails = async (jobId, artisanId) => {
   return { job, notFound: false, forbidden: false };
 };
 
-export const rejectPrivateJobBooking = async (jobId, artisanId, status) => {
-  const job = await jobModel
-    .findById(jobId)
-    .populate("customerId", "fullName phoneNumber");
+export const rejectPrivateJobBooking = async (jobId, artisanId, session) => {
+  const job = await jobModel.findById(jobId).session(session);
 
   if (!job) {
     return { job: null, forbidden: false, notFound: true, invalidState: false };
@@ -409,7 +432,7 @@ export const rejectPrivateJobBooking = async (jobId, artisanId, status) => {
     {
       status: "rejected",
     },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
 
   if (!updateJob) {
@@ -424,8 +447,8 @@ export const rejectPrivateJobBooking = async (jobId, artisanId, status) => {
   };
 };
 
-export const acceptPrivateJobBooking = async (jobId, artisanId) => {
-  const job = await jobModel.findById(jobId);
+export const acceptPrivateJobBooking = async (jobId, artisanId, session) => {
+  const job = await jobModel.findById(jobId).session(session);
 
   if (!job) {
     return { job: null, notFound: true, forbidden: false, invalidState: false };
@@ -446,7 +469,7 @@ export const acceptPrivateJobBooking = async (jobId, artisanId) => {
     {
       status: "accepted",
     },
-    { returnDocument: "after" },
+    { returnDocument: "after", session },
   );
 
   if (!updateJob) {

@@ -17,13 +17,21 @@ import {
   rejectPrivateJobBooking,
   acceptPrivateJobBooking,
 } from "../service/jobService.js";
+import {
+  holdEscrow,
+  assignArtisan,
+  refundEscrow,
+  freezeEscrow,
+} from "../service/escrowService.js";
 import mongoose from "mongoose";
 import User from "../model/auth.js";
 import artisanProfileModel from "../model/artisanProfileModel.js";
-import jobModel from "../model/jobModel.js";
 
-// Creates a new job posting. Only customers are allowed to post jobs.
+// Creates a job for the logged-in customer and takes the job price from their
+// wallet into escrow in the same transaction. If the balance is too low, nothing
+// is saved and the customer is told to fund their wallet.
 export const createNewJob = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
 
@@ -38,11 +46,29 @@ export const createNewJob = async (req, res) => {
         .status(403)
         .json({ success: false, message: "Only customers can post jobs" });
     }
-    const job = await createJob({ customerId: userId, ...req.body });
+    let job;
+    await session.withTransaction(async () => {
+      job = await createJob({ ...req.body, customerId: userId, session });
+      await holdEscrow(job._id, session);
+    });
 
     res.status(201).json({ success: true, message: "Job created", data: job });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (
+      ["Insufficient balance", "Wallet not found", "Wallet is frozen"].includes(
+        err.message,
+      )
+    ) {
+      return res.status(402).json({
+        success: false,
+        message:
+          "Insufficient wallet balance. Fund your wallet to post this job.",
+      });
+    }
+    console.error(err);
+    res.status(500).json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -134,10 +160,11 @@ export const matchJobDetails = async (req, res) => {
   }
 };
 
-// Lets an artisan accept a pending job. Race-condition safe — see
-// ArtisanAcceptJob in jobService.js for the atomic update that prevents
-// two artisans from accepting the same job at once.
+// Lets an artisan accept a pending job that matches their skills.
+// The job update and the escrow assignment happen in one transaction, so a job
+// is never accepted without its escrow being attached to the artisan.
 export const acceptJobController = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
     const { jobId } = req.params;
@@ -165,22 +192,39 @@ export const acceptJobController = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Artisan profile not found" });
     }
-    const { job, forbidden, alreadyTaken, notFound } = await ArtisanAcceptJob(
-      jobId,
-      userId,
-      artisanProfile.skills,
-    );
-    if (notFound) {
+
+    let result;
+    await session.withTransaction(async () => {
+      result = await ArtisanAcceptJob(
+        jobId,
+        userId,
+        artisanProfile.skills,
+        session,
+      );
+
+      if (!result.job) return;
+
+      const escrowResult = await assignArtisan(jobId, session, userId);
+      if (
+        escrowResult.notFound ||
+        escrowResult.alreadyAssigned ||
+        escrowResult.notHeld
+      ) {
+        throw new Error("JOB_UNAVAILABLE");
+      }
+    });
+
+    if (result.notFound) {
       return res.status(404).json({ success: false, message: "Job not found" });
     }
 
-    if (forbidden) {
+    if (result.forbidden) {
       return res.status(403).json({
         success: false,
         message: "You are not qualified for this job category",
       });
     }
-    if (alreadyTaken) {
+    if (result.alreadyTaken) {
       return res.status(409).json({
         success: false,
         message: "Job has already been accepted by another artisan",
@@ -189,7 +233,18 @@ export const acceptJobController = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Job accepted", job });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err.message === "JOB_UNAVAILABLE") {
+      return res.status(409).json({
+        success: false,
+        message: "This job is no longer available",
+      });
+    }
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -395,69 +450,99 @@ export const customerActiveJobController = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
-
+// Raises a dispute and freezes the escrow in one transaction.
 export const customerRaiseDisputeController = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
     const { disputeReason } = req.body;
     const { jobId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
       return res
-        .status(404)
+        .status(400)
         .json({ success: false, message: "Invalid job ID" });
     }
+
     const user = await User.findById(userId);
     if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User does not exist" });
     }
-
     if (user.role !== "customer") {
       return res.status(403).json({
         success: false,
-        message: "Only a customer can make  this request",
+        message: "Only a customer can make this request",
       });
     }
-
     if (!disputeReason) {
       return res
         .status(400)
-        .json({ success: false, message: "Please add what happend" });
+        .json({ success: false, message: "Please add what happened" });
     }
-    const { job, forbidden, notFound, invalidState } =
-      await CustomerRaiseDispute(jobId, userId, disputeReason);
 
-    if (notFound) {
+    let result;
+    await session.withTransaction(async () => {
+      result = await CustomerRaiseDispute(
+        jobId,
+        userId,
+        disputeReason,
+        session,
+      );
+      if (!result.job) return;
+
+      const escrowResult = await freezeEscrow(jobId, session);
+      if (escrowResult.notFound || escrowResult.notHeld) {
+        throw new Error("DISPUTE_NOT_ALLOWED");
+      }
+    });
+
+    if (result.notFound) {
       return res.status(404).json({ success: false, message: "Job not found" });
     }
-    if (forbidden) {
+    if (result.forbidden) {
       return res
         .status(403)
         .json({ success: false, message: "You can't make this request" });
     }
-
-    if (invalidState) {
+    if (result.invalidState) {
       return res.status(409).json({
         success: false,
         message: "This job is no longer eligible for a dispute",
       });
     }
-    res
-      .status(200)
-      .json({ success: true, message: "Dispute raised successfully", job });
+
+    return res.status(200).json({
+      success: true,
+      message: "Dispute raised successfully",
+      data: result.job,
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err.message === "DISPUTE_NOT_ALLOWED") {
+      return res.status(409).json({
+        success: false,
+        message: "Dispute can't be raised for this job",
+      });
+    }
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
 
+// Cancels a job and refunds the customer in one transaction.
 export const customerCancelJobController = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
     const { jobId } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
-      return res.status(404).json({ success: "Invalid job ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid job ID" });
     }
 
     const user = await User.findById(userId);
@@ -473,31 +558,54 @@ export const customerCancelJobController = async (req, res) => {
       });
     }
 
-    const { job, forbidden, notFound, invalidState } = await CustomerCancelJob(
-      jobId,
-      userId,
-    );
+    let result;
+    await session.withTransaction(async () => {
+      result = await CustomerCancelJob(jobId, userId, session);
+      if (!result.job) return;
 
-    if (notFound) {
+      const escrowResult = await refundEscrow(jobId, session);
+      if (
+        escrowResult.notFound ||
+        escrowResult.notAllowed ||
+        escrowResult.notHeld
+      ) {
+        throw new Error("REFUND_FAILED");
+      }
+    });
+
+    if (result.notFound) {
       return res.status(404).json({ success: false, message: "Job not found" });
     }
-    if (forbidden) {
+    if (result.forbidden) {
       return res
         .status(403)
-        .json({ succcesS: false, message: "You can't make this request" });
+        .json({ success: false, message: "You can't make this request" });
     }
-    if (invalidState) {
+    if (result.invalidState) {
       return res.status(409).json({
         success: false,
         message: "This job can no longer be cancelled",
       });
     }
 
-    res
-      .status(200)
-      .json({ success: true, message: "Job has beeen cancelled", job });
+    return res.status(200).json({
+      success: true,
+      message: "Job has been cancelled",
+      data: result.job,
+    });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (err.message === "REFUND_FAILED") {
+      return res.status(409).json({
+        success: false,
+        message: "This job can't be cancelled right now",
+      });
+    }
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -538,37 +646,66 @@ export const customerJobHistoryController = async (req, res) => {
   }
 };
 
+// Posts a private job to an artisan and holds the money in one transaction.
 export const PrivateJobBookingController = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
 
     const user = await User.findById(userId);
-
     if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User does not exist" });
     }
-
     if (user.role !== "customer") {
       return res
         .status(403)
         .json({ success: false, message: "Only customers can post jobs" });
     }
-    const { job, notFound } = await PrivateJobBooking({
-      customerId: userId,
-      ...req.body,
+
+    let result;
+    await session.withTransaction(async () => {
+      result = await PrivateJobBooking({
+        ...req.body,
+        customerId: userId,
+        session,
+      });
+      if (!result.job) return;
+      await holdEscrow(result.job._id, session);
     });
-    if (notFound) {
+
+    if (result.notFound) {
       return res
         .status(404)
         .json({ success: false, message: "Artisan does not exist" });
     }
-    res
+
+    return res
       .status(201)
-      .json({ success: true, message: "Job sent to the artisan", data: job });
+      .json({
+        success: true,
+        message: "Job sent to the artisan",
+        data: result.job,
+      });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    if (
+      ["Insufficient balance", "Wallet not found", "Wallet is frozen"].includes(
+        err.message,
+      )
+    ) {
+      return res.status(402).json({
+        success: false,
+        message:
+          "Insufficient wallet balance. Fund your wallet to post this job.",
+      });
+    }
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
 
@@ -643,108 +780,147 @@ export const privateJobBookingDetailsController = async (req, res) => {
   }
 };
 
+// Accepts a private job and attaches the artisan to the escrow.
 export const acceptPrivateJobBookingController = async (req, res) => {
+  const session = await mongoose.startSession();
   try {
     const userId = req.user.id;
     const { jobId } = req.params;
-
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "user does not exist" });
-    }
-
-    if (user.role !== "artisan") {
-      return res.status(403).json({
-        success: false,
-        message: "Only artisan can make this request",
-      });
-    }
-
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid job ID" });
     }
 
-    const { job, notFound, forbidden, invalidState } =
-      await acceptPrivateJobBooking(jobId, user._id);
-
-    if (notFound) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Job does not exist" });
-    }
-
-    if (forbidden) {
-      return res
-        .status(403)
-        .json({ success: false, message: "You are not assigned for this job" });
-    }
-
-    if (invalidState) {
-      return res
-        .status(400)
-        .json({ success: false, message: "You can't accept this job" });
-    }
-
-    res.status(200).json({ success: true, data: job });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-export const rejectPrivateJobBookingController = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { jobId } = req.params;
-
     const user = await User.findById(userId);
-
     if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User does not exist" });
     }
-
     if (user.role !== "artisan") {
       return res.status(403).json({
-        suvcess: false,
+        success: false,
         message: "Only artisan can make this request",
       });
     }
 
+    let result;
+    await session.withTransaction(async () => {
+      result = await acceptPrivateJobBooking(jobId, userId, session);
+      if (!result.job) return;
+
+      const escrowResult = await assignArtisan(jobId, session, userId);
+      if (
+        escrowResult.notFound ||
+        escrowResult.alreadyAssigned ||
+        escrowResult.notHeld
+      ) {
+        throw new Error("JOB_UNAVAILABLE");
+      }
+    });
+
+    if (result.notFound) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Job does not exist" });
+    }
+    if (result.forbidden) {
+      return res
+        .status(403)
+        .json({ success: false, message: "You are not assigned for this job" });
+    }
+    if (result.invalidState) {
+      return res
+        .status(409)
+        .json({ success: false, message: "You can't accept this job" });
+    }
+
+    return res.status(200).json({ success: true, data: result.job });
+  } catch (err) {
+    if (err.message === "JOB_UNAVAILABLE") {
+      return res
+        .status(409)
+        .json({ success: false, message: "This job is no longer available" });
+    }
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
+  }
+};
+
+// Rejects a private job and refunds the customer in full.
+export const rejectPrivateJobBookingController = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const userId = req.user.id;
+    const { jobId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid job ID" });
     }
 
-    const { job, notFound, forbidden, invalidState } =
-      await rejectPrivateJobBooking(jobId, user._id);
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+    if (user.role !== "artisan") {
+      return res.status(403).json({
+        success: false,
+        message: "Only artisan can make this request",
+      });
+    }
 
-    if (notFound) {
+    let result;
+    await session.withTransaction(async () => {
+      result = await rejectPrivateJobBooking(jobId, userId, session);
+      if (!result.job) return;
+
+      const escrowResult = await refundEscrow(jobId, session);
+      if (
+        escrowResult.notFound ||
+        escrowResult.notAllowed ||
+        escrowResult.notHeld
+      ) {
+        throw new Error("REFUND_FAILED");
+      }
+    });
+
+    if (result.notFound) {
       return res
         .status(404)
         .json({ success: false, message: "Job does not exist" });
     }
-
-    if (forbidden) {
+    if (result.forbidden) {
       return res
         .status(403)
         .json({ success: false, message: "You are not assigned for this job" });
     }
+    if (result.invalidState) {
+      return res
+        .status(409)
+        .json({ success: false, message: "Only pending jobs can be rejected" });
+    }
 
-    if (invalidState) {
+    return res.status(200).json({ success: true, data: result.job });
+  } catch (err) {
+    if (err.message === "REFUND_FAILED") {
       return res.status(409).json({
         success: false,
-        message: "Only pending jobs can be rejected",
+        message: "This job can't be rejected right now",
       });
     }
-    res.status(200).json({ success: true, data: job });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error(err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
+  } finally {
+    session.endSession();
   }
 };
