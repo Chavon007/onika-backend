@@ -3,7 +3,7 @@ import {
   createWallet,
   getWallet,
   getTransactions,
-} from "../service/walletService";
+} from "../service/walletService.js";
 
 export const createWallletController = async (req, res) => {
   try {
