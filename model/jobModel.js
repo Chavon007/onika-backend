@@ -43,11 +43,6 @@ const JobSchema = new mongoose.Schema(
       min: 1,
       validate: isWholeNumber,
     },
-    agreedPrice: {
-      type: Number,
-      default: null,
-      validate: isWholeNumber,
-    },
     status: {
       type: String,
       enum: [
