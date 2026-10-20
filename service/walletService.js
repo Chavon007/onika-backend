@@ -1,22 +1,22 @@
-import walletModel from "../model/walletModel";
-import transactionModel from "../model/transactionModel";
+import walletModel from "../model/walletModel.js";
+import transactionModel from "../model/transactionModel.js";
 export const createWallet = async (userId, session = null) => {
   const existing = await walletModel.findOne({ User: userId }).session(session);
   if (existing) {
-    return { wallet: existing, forbidden: false };
+    return { wallet: existing, created: false };
   }
 
   const [wallet] = await walletModel.create([{ User: userId }], { session });
-  return { wallet, forbidden: false };
+  return { wallet, created: true };
 };
 
 export const getWallet = async (userId, session) => {
-  const wallet = await walletModel.findById({ User: userId }).session(session);
+  const wallet = await walletModel.findOne({ User: userId }).session(session);
   if (!wallet) {
-    return { wallet: null, forbidden: false, notFound: true };
+    return { wallet: null, notFound: true };
   }
 
-  return { wallet, forbidden: false, notFound: false };
+  return { wallet, notFound: false };
 };
 
 export const creditWallet = async (
@@ -49,7 +49,7 @@ export const creditWallet = async (
       status: "active",
     },
     { $inc: { balance: amount } },
-    { returnDocument: true, session },
+    { new: true, session },
   );
   if (!wallet) {
     throw new Error("Wallet not found or frozen");
@@ -137,4 +137,21 @@ export const debitWallet = async (
   );
 
   return { wallet, transaction, duplicate: false };
+};
+
+export const getTransactions = async (userId, page = 1, limit = 6) => {
+  const skip = (page - 1) * limit;
+
+  const [transactions, total] = await Promise.all([
+    transactionModel
+      .find({ User: userId })
+      .select("-metadata -__v")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    transactionModel.countDocuments({ User: userId }),
+  ]);
+
+  return { transactions, total, totalpage: Math.ceil(total / limit) };
 };
