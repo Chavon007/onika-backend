@@ -57,4 +57,11 @@ const withdrawalSchema = new mongoose.Schema(
   },
 );
 withdrawalSchema.index({ User: 1, createdAt: -1 });
+withdrawalSchema.index(
+  { User: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ["pending", "processing"] } },
+  },
+);
 export default mongoose.model("withdrawal", withdrawalSchema);
