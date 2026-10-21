@@ -15,6 +15,7 @@ import redisclient from "./config/redis.js";
 import jobRouter from "./route/jobRoute.js";
 import PaymentRoute from "./route/paymentRoute.js";
 import WalletRoute from "./route/walletRoute.js";
+import BankRouter from "./route/bankRoute.js";
 import { startAutoReleaseJob } from "./jobs/autoReleaseJob.js";
 const app = express();
 app.use(express.json());
@@ -37,6 +38,7 @@ app.use("/api/cloudinary", CloudinaryRouter);
 app.use("/api", jobRouter);
 app.use("/api", PaymentRoute);
 app.use("/api", WalletRoute);
+app.use("/api", BankRouter);
 
 const startServer = async () => {
   try {
