@@ -17,6 +17,7 @@ import PaymentRoute from "./route/paymentRoute.js";
 import WalletRoute from "./route/walletRoute.js";
 import BankRouter from "./route/bankRoute.js";
 import { startAutoReleaseJob } from "./jobs/autoReleaseJob.js";
+import WithdrawalRouter from "./route/withdrawalRoute.js";
 const app = express();
 app.use(express.json());
 app.use(
@@ -39,6 +40,7 @@ app.use("/api", jobRouter);
 app.use("/api", PaymentRoute);
 app.use("/api", WalletRoute);
 app.use("/api", BankRouter);
+app.use("/api", WithdrawalRouter);
 
 const startServer = async () => {
   try {

@@ -199,5 +199,5 @@ export const getWithdrawals = async (userId, page, limit) => {
     withdrawalModel.countDocuments({ User: userId }),
   ]);
 
-  return { withdrawal, total, totalPage: Math.ceil(total / limit) };
+  return { withdrawal, total, totalPages: Math.ceil(total / limit) };
 };
