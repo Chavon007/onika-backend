@@ -21,7 +21,7 @@ export const requestWithdrawal = async (userId, amount, session) => {
     };
   }
 
-  const account = await withdrawalModel
+  const account = await bankAccountModel
     .findOne({ User: userId })
     .session(session);
   if (!account) {
@@ -117,7 +117,7 @@ export const markWithdrawalSuccessful = async (
     };
   }
 
-  const found = await withdrawalModel.findOne({ reference }).sessin(session);
+  const found = await withdrawalModel.findOne({ reference }).session(session);
 
   if (!found) {
     return {
@@ -143,21 +143,20 @@ export const markWithdrawalSuccessful = async (
   };
 };
 
+// Marks a withdrawal as failed and returns the money to the user's wallet.
+// The status change and the refund happen in the caller's session. The status
+// filter means it can only run once, so a repeated provider webhook can't
+// refund twice, and a withdrawal that already succeeded is never refunded.
 export const markWithdrawalFailed = async (
   reference,
   reason,
   session,
   providerReference = null,
 ) => {
-  if (!session) {
-    throw new Error("A database session is required");
-  }
+  if (!session) throw new Error("A database session is required");
 
   const withdrawal = await withdrawalModel.findOneAndUpdate(
-    {
-      reference,
-      status: { $in: ["pending", "processing"] },
-    },
+    { reference, status: { $in: ["pending", "processing"] } },
     {
       $set: {
         status: "failed",
@@ -168,36 +167,44 @@ export const markWithdrawalFailed = async (
     { new: true, session },
   );
 
-  // Prevent refunding if the withdrawal was not updated.
   if (!withdrawal) {
-    return null;
+    const found = await withdrawalModel.findOne({ reference }).session(session);
+    if (!found) {
+      return { withdrawal: found, notFound: true, alreadyFailed: false, alreadySuccessful: false };
+    }
+    if (found.status === "failed") {
+      return { withdrawal: found, notFound: false, alreadyFailed: true, alreadySuccessful: false };
+    }
+    return { withdrawal: found, notFound: false, alreadyFailed: false, alreadySuccessful: true };
   }
 
   await creditWallet(
     withdrawal.User,
     withdrawal.amount,
     "refund",
-    `refund_${withdrawal._id}`,
+    `withdrawal_refund_${withdrawal._id}`,
     null,
-    "Withdrawal failed — refunded to wallet",
+    "Withdrawal failed, refunded to wallet",
     session,
   );
 
-  return withdrawal;
+  return { withdrawal, notFound: false, alreadyFailed: false, alreadySuccessful: false };
 };
 
-export const getWithdrawals = async (userId, page, limit) => {
+// Returns a user's withdrawal history, newest first, one page at a time.
+export const getWithdrawals = async (userId, page = 1, limit = 6) => {
   const skip = (page - 1) * limit;
 
-  const [withdrawal, total] = await Promise.all([
+  const [withdrawals, total] = await Promise.all([
     withdrawalModel
       .find({ User: userId })
-      .populate("bankName, ")
+      .select("amount status bankAccount reference failureReason createdAt")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     withdrawalModel.countDocuments({ User: userId }),
   ]);
 
-  return { withdrawal, total, totalPages: Math.ceil(total / limit) };
+  return { withdrawals, total, totalPages: Math.ceil(total / limit) };
 };
