@@ -52,6 +52,21 @@ const withdrawalSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    fee: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: { validator: Number.isInteger, message: "Fee must be in kobo" },
+    },
+    netAmount: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "Net amount must be in kobo",
+      },
+    },
   },
   {
     timestamps: true,

@@ -1,9 +1,25 @@
-import withdrawalModel from "../model/withdrawalModel";
-import bankAccountModel from "../model/bankAccountModel";
-import { debitWallet, creditWallet } from "./walletService";
+import withdrawalModel from "../model/withdrawalModel.js";
+import bankAccountModel from "../model/bankAccountModel.js";
+import { debitWallet, creditWallet } from "./walletService.js";
+import { getTransferFee } from "../config/platform.js";
 import mongoose from "mongoose";
+import { runInTransaction } from "../utliz/runInTransaction.js";
+import {
+  createTransferRecipient,
+  initializeTransaction,
+  initiateTransfer,
+  verifyTransfer,
+} from "./paystackService.js";
 
 const MIN_WITHDRAWAL = 100000; // 1,000 naira in kobo
+const FAILED_TRANSFER_STATUSES = [
+  "failed",
+  "reversed",
+  "abandoned",
+  "rejected",
+  "blocked",
+  "cancelled",
+];
 
 // Starts a withdrawal for the logged-in user.
 // Takes the amount out of the wallet straight away and records the withdrawal
@@ -20,6 +36,9 @@ export const requestWithdrawal = async (userId, amount, session) => {
       hasOpenWithdrawal: false,
     };
   }
+
+  const fee = getTransferFee(amount);
+  const netAmount = amount - fee;
 
   const account = await bankAccountModel
     .findOne({ User: userId })
@@ -64,6 +83,8 @@ export const requestWithdrawal = async (userId, amount, session) => {
         User: userId,
         walletId: wallet._id,
         amount,
+        fee,
+        netAmount,
         bankAccount: {
           bankCode: account.bankCode,
           bankName: account.bankName,
@@ -76,7 +97,6 @@ export const requestWithdrawal = async (userId, amount, session) => {
     ],
     { session },
   );
-
   return {
     withdrawal,
     belowMinimum: false,
@@ -170,12 +190,27 @@ export const markWithdrawalFailed = async (
   if (!withdrawal) {
     const found = await withdrawalModel.findOne({ reference }).session(session);
     if (!found) {
-      return { withdrawal: found, notFound: true, alreadyFailed: false, alreadySuccessful: false };
+      return {
+        withdrawal: found,
+        notFound: true,
+        alreadyFailed: false,
+        alreadySuccessful: false,
+      };
     }
     if (found.status === "failed") {
-      return { withdrawal: found, notFound: false, alreadyFailed: true, alreadySuccessful: false };
+      return {
+        withdrawal: found,
+        notFound: false,
+        alreadyFailed: true,
+        alreadySuccessful: false,
+      };
     }
-    return { withdrawal: found, notFound: false, alreadyFailed: false, alreadySuccessful: true };
+    return {
+      withdrawal: found,
+      notFound: false,
+      alreadyFailed: false,
+      alreadySuccessful: true,
+    };
   }
 
   await creditWallet(
@@ -188,7 +223,12 @@ export const markWithdrawalFailed = async (
     session,
   );
 
-  return { withdrawal, notFound: false, alreadyFailed: false, alreadySuccessful: false };
+  return {
+    withdrawal,
+    notFound: false,
+    alreadyFailed: false,
+    alreadySuccessful: false,
+  };
 };
 
 // Returns a user's withdrawal history, newest first, one page at a time.
@@ -198,7 +238,9 @@ export const getWithdrawals = async (userId, page = 1, limit = 6) => {
   const [withdrawals, total] = await Promise.all([
     withdrawalModel
       .find({ User: userId })
-      .select("amount status bankAccount reference failureReason createdAt")
+      .select(
+        "amount fee netAmount status bankAccount reference failureReason createdAt",
+      )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -207,4 +249,143 @@ export const getWithdrawals = async (userId, page = 1, limit = 6) => {
   ]);
 
   return { withdrawals, total, totalPages: Math.ceil(total / limit) };
+};
+
+// Applies a Paystack transfer status to our withdrawal record.
+// Success pays out, a failure refunds the wallet, anything else keeps waiting.
+
+const applyTransferStatus = async (withdrawal, transfer) => {
+  if (transfer.status === "success") {
+    await runInTransaction((s) =>
+      markWithdrawalSuccessful(withdrawal.reference, transfer.transfer_code, s),
+    );
+    return "successful";
+  }
+
+  if (FAILED_TRANSFER_STATUSES.includes(transfer.status)) {
+    await runInTransaction((s) =>
+      markWithdrawalFailed(
+        withdrawal.reference,
+        `transfer ${transfer.status}`,
+        s,
+        transfer.transfer_code,
+      ),
+    );
+
+    return "failed";
+  }
+
+  return "processing";
+};
+
+// Sends a pending withdrawal to Paystack. Runs after the request transaction
+// has committed. Only one caller can claim a withdrawal (pending to processing),
+// so it can never be sent twice. If Paystack rejects the request outright, the
+// wallet is refunded. If the result is unknown (timeout, server error), it stays
+// "processing" and reconcileWithdrawals settles it later.
+
+export const processWithdrawal = async (withdrawalId) => {
+  const withdrawal = await withdrawalModel.findOneAndUpdate(
+    {
+      _id: withdrawalId,
+      status: "pending",
+    },
+    { $set: { status: "processing" } },
+    { new: true },
+  );
+
+  if (!withdrawal) return { skipped: true };
+
+  try {
+    const recipient = await createTransferRecipient(withdrawal.bankAccount);
+    const transfer = await initiateTransfer({
+      amount: withdrawal.netAmount,
+      recipient: recipient.recipient_code,
+      reference: withdrawal.reference,
+      reason: "Onika wallet withdrawal",
+    });
+
+    await withdrawalModel.updateOne(
+      { _id: withdrawal._id },
+      { $set: { providerReference: transfer.transfer_code } },
+    );
+
+    const status = await applyTransferStatus(withdrawal, transfer);
+    return { skipped: false, status };
+  } catch (err) {
+    const rejected =
+      err.statusCode >= 400 && err.statusCode < 500 && err.statusCode !== 429;
+
+    if (rejected) {
+      console.error(`Paystack rejected ${withdrawal.reference}:`, err.message);
+      await runInTransaction((s) =>
+        markWithdrawalFailed(withdrawal.reference, err.message, s),
+      );
+      return { skipped: false, status: "failed" };
+    }
+
+    console.error(
+      `Withdrawal ${withdrawal.reference} is unconfirmed:`,
+      err.message,
+    );
+    return { skipped: false, status: "processing" };
+  }
+};
+
+// Safety net for withdrawals that got stuck.
+// Sends pending ones that were never processed (for example the server restarted),
+// and asks Paystack about processing ones that never got a result.
+// A transfer Paystack has no record of is refunded.
+
+export const reconcileWithdrawals = async () => {
+  const now = Date.now();
+
+  const stalePending = await withdrawalModel
+    .find({
+      status: "pending",
+      updatedAt: { $lt: new Date(now - 2 * 60 * 1000) },
+    })
+    .select("_id")
+    .limit(50)
+    .lean();
+
+  for (const { _id } of stalePending) {
+    await processWithdrawal(_id);
+  }
+
+  const stuck = await withdrawalModel
+    .find({
+      status: "processing",
+      updatedAt: { $lt: new Date(now - 10 * 60 * 1000) },
+    })
+    .select("reference")
+    .limit(50)
+    .lean();
+
+  for (const withdrawal of stuck) {
+    try {
+      let transfer = null;
+      try {
+        transfer = await verifyTransfer(withdrawal.reference);
+      } catch (err) {
+        if (err.statusCode !== 404) throw err;
+      }
+      if (transfer) {
+        await applyTransferStatus(withdrawal, transfer);
+      } else {
+        await runInTransaction((s) =>
+          markWithdrawalFailed(
+            withdrawal.reference,
+            "Transfer was never created",
+            s,
+          ),
+        );
+      }
+    } catch (err) {
+      console.error(
+        `Reconcile failed for ${withdrawal.reference}:`,
+        err.message,
+      );
+    }
+  }
 };

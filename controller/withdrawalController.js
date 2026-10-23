@@ -4,6 +4,7 @@ import {
   requestWithdrawal,
   getWithdrawals,
 } from "../service/withdrawalService.js";
+import { processWithdrawal } from "../service/withdrawalService.js";
 
 // Starts a withdrawal for the logged-in user. The amount comes in kobo and is
 // taken from the wallet straight away. Returns a clear message for a low
@@ -45,6 +46,9 @@ export const requestWithdrawalController = async (req, res) => {
       });
     }
 
+    processWithdrawal(result.withdrawal._id).catch((err) =>
+      console.error("processWithdrawal failed:", err.message),
+    );
     return res.status(201).json({
       success: true,
       message: "Withdrawal requested successfully",

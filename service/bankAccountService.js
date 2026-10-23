@@ -1,7 +1,9 @@
 import mongoose from "mongoose";
 import bankAccountModel from "../model/bankAccountModel.js";
-
+import { listBanks } from "./paystackService.js";
 const MAX_ACCOUNTS = 3;
+
+let bankCache = { banks: null, loadedAt: 0 };
 
 // Saves a bank account for the logged-in user.
 // Refuses once the user has reached the account limit, and a repeated
@@ -59,4 +61,16 @@ export const deleteBankAccount = async (userId, accountId) => {
     return { bank: null, notFound: true };
   }
   return { bank, notFound: false };
+};
+// Returns Paystack's bank list as { name, code }, cached for 24 hours.
+export const getBankList = async () => {
+  const isFresh = Date.now() - bankCache.loadedAt < 24 * 60 * 60 * 1000;
+  if (bankCache.banks && isFresh) return bankCache.banks;
+
+  const banks = await listBanks();
+  bankCache = {
+    banks: banks.map((b) => ({ name: b.name, code: b.code })),
+    loadedAt: Date.now(),
+  };
+  return bankCache.banks;
 };
