@@ -1,4 +1,4 @@
-import jobModel from "../model/jobModel";
+import jobModel from "../model/jobModel.js";
 // Marks the job completed when the customer confirms the work.
 // The money is released by the controller in the same transaction.
 export const customerReleasePayment = async (jobId, customerId, session) => {

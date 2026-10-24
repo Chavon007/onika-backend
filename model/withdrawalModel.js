@@ -35,6 +35,7 @@ const withdrawalSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "processing", "successful", "failed"],
       default: "pending",
+      required: true,
     },
 
     reference: {
@@ -51,10 +52,32 @@ const withdrawalSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    fee: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: { validator: Number.isInteger, message: "Fee must be in kobo" },
+    },
+    netAmount: {
+      type: Number,
+      required: true,
+      min: 1,
+      validate: {
+        validator: Number.isInteger,
+        message: "Net amount must be in kobo",
+      },
+    },
   },
   {
     timestamps: true,
   },
 );
 withdrawalSchema.index({ User: 1, createdAt: -1 });
+withdrawalSchema.index(
+  { User: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ["pending", "processing"] } },
+  },
+);
 export default mongoose.model("withdrawal", withdrawalSchema);

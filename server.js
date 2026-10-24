@@ -7,6 +7,8 @@ import {
 } from "./utliz/rateLimiter.js";
 import cookies from "cookie-parser";
 import cors from "cors";
+import { paystackWebhookController } from "./controller/webhookController.js";
+import { startWithdrawalJob } from "./jobs/withdrawalJob.js";
 import AuthRoutes from "./route/authRoute.js";
 import { dbConfig } from "./config/dbConfig.js";
 import AristanProfileRoute from "./route/artisanProfileRoute.js";
@@ -17,7 +19,14 @@ import PaymentRoute from "./route/paymentRoute.js";
 import WalletRoute from "./route/walletRoute.js";
 import BankRouter from "./route/bankRoute.js";
 import { startAutoReleaseJob } from "./jobs/autoReleaseJob.js";
+import WithdrawalRouter from "./route/withdrawalRoute.js";
 const app = express();
+
+app.post(
+  "/api/paystack/webhook",
+  express.raw({ type: "application/json" }),
+  paystackWebhookController,
+);
 app.use(express.json());
 app.use(
   cors({
@@ -39,12 +48,13 @@ app.use("/api", jobRouter);
 app.use("/api", PaymentRoute);
 app.use("/api", WalletRoute);
 app.use("/api", BankRouter);
+app.use("/api", WithdrawalRouter);
 
 const startServer = async () => {
   try {
     await dbConfig();
-    await redisclient.connect();
     startAutoReleaseJob();
+    startWithdrawalJob();
     app.listen(PORT, () => {
       console.log(`Server is running on port http://localhost:${PORT}`);
     });
