@@ -10,12 +10,13 @@ const MIN_FUNDING = 10000; //100 naira in kobo
 // The user ID goes into metadata so the webhook knows whose wallet to credit.
 
 export const startFunding = async (userId, amount) => {
+    
   if (!Number.isInteger(amount) || amount < MIN_FUNDING) {
     return { belowMinimum: true, notFound: false };
   }
 
   const user = await User.findById(userId).select("email");
-  if (!user) return { belowMinimum: false, notFound: tre };
+  if (!user) return { belowMinimum: false, notFound: true };
 
   const reference = `fund_${userId}_${crypto.randomBytes(4).toString("hex")}`;
 
@@ -40,17 +41,19 @@ export const startFunding = async (userId, amount) => {
 // Used by both the webhook and the verify endpoint. The payment reference is
 // the ledger reference, so whichever runs second finds it already credited.
 
-export const creditFundingPayment = async (Payment, session) => {
-  if (Payment.status !== "success" || Payment.currency !== "NGN")
+export const creditFundingPayment = async (payment, session) => {
+  if (payment.status !== "success" || payment.currency !== "NGN") {
     return { credited: false, duplicate: false };
+  }
 
-  const userId = Payment.metadata?.userId;
+  const userId = payment.metadata?.userId;
   if (
     payment.metadata?.purpose !== "wallet_funding" ||
     !mongoose.isValidObjectId(userId)
   ) {
     return { credited: false, duplicate: false };
   }
+
   await createWallet(userId, session);
 
   const result = await creditWallet(

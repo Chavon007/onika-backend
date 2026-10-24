@@ -7,9 +7,10 @@ import { runInTransaction } from "../utliz/runInTransaction.js";
 
 // Starts a wallet funding payment and returns the Paystack payment link.
 export const startFundingController = async (req, res) => {
+
   try {
     const userId = req.user.id;
-    const { amount } = Number(req.body.amount);
+    const  amount  = Number(req.body.amount);
 
     const result = await startFunding(userId, amount);
 

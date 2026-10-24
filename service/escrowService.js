@@ -64,7 +64,7 @@ export const assignArtisan = async (jobId, session, artisanId) => {
       artisanId: null,
     },
     { $set: { artisanId } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   if (escrow) {
@@ -156,7 +156,7 @@ export const releaseEscrow = async (jobId, session) => {
         releasedAt: new Date(),
       },
     },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   if (!escrow) {
@@ -241,7 +241,7 @@ export const refundEscrow = async (jobId, session) => {
         refundedAt: new Date(),
       },
     },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
   if (!escrow) {
     return {
@@ -278,7 +278,7 @@ export const freezeEscrow = async (jobId, session) => {
   const escrow = await escrowModel.findOneAndUpdate(
     { jobId, status: "held" },
     { $set: { status: "frozen" } },
-    { new: true, session },
+    { returnDocument: "after", session },
   );
 
   if (!escrow) {
