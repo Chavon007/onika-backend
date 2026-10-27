@@ -1,3 +1,4 @@
+import User from "../model/auth.js";
 import { verifyTransaction } from "../service/paystackService.js";
 import {
   startFunding,
@@ -7,11 +8,20 @@ import { runInTransaction } from "../utliz/runInTransaction.js";
 
 // Starts a wallet funding payment and returns the Paystack payment link.
 export const startFundingController = async (req, res) => {
-
   try {
     const userId = req.user.id;
-    const  amount  = Number(req.body.amount);
+    const amount = Number(req.body.amount);
 
+    const user = await User.findById(userId);
+
+    if (user.role !== "customer") {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Only customeer can make this request",
+        });
+    }
     const result = await startFunding(userId, amount);
 
     if (result.notFound) {
