@@ -49,7 +49,8 @@ export const createNewJob = async (req, res) => {
     let job;
     await session.withTransaction(async () => {
       job = await createJob({ ...req.body, customerId: userId, session });
-      await holdEscrow(job._id, session);
+      const held = await holdEscrow(job._id, session);
+      if (held.notFound || held.alreadyHeld) throw new Error("ESCROW_FAILED");
     });
 
     res.status(201).json({ success: true, message: "Job created", data: job });
@@ -231,7 +232,9 @@ export const acceptJobController = async (req, res) => {
       });
     }
 
-    res.status(200).json({ success: true, message: "Job accepted", job });
+    res
+      .status(200)
+      .json({ success: true, message: "Job accepted", data: result.job });
   } catch (err) {
     if (err.message === "JOB_UNAVAILABLE") {
       return res.status(409).json({
@@ -675,19 +678,19 @@ export const PrivateJobBookingController = async (req, res) => {
       await holdEscrow(result.job._id, session);
     });
 
+    const held = await holdEscrow(result.job._id, session);
+    if (held.notFound || held.alreadyHeld) throw new Error("ESCROW_FAILED");
     if (result.notFound) {
       return res
         .status(404)
         .json({ success: false, message: "Artisan does not exist" });
     }
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Job sent to the artisan",
-        data: result.job,
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Job sent to the artisan",
+      data: result.job,
+    });
   } catch (err) {
     if (
       ["Insufficient balance", "Wallet not found", "Wallet is frozen"].includes(

@@ -1,4 +1,5 @@
 import jobModel from "../model/jobModel.js";
+import { RELEASE_DELAY_MS } from "../config/platform.js";
 // Marks the job completed when the customer confirms the work.
 // The money is released by the controller in the same transaction.
 export const customerReleasePayment = async (jobId, customerId, session) => {
@@ -12,11 +13,23 @@ export const customerReleasePayment = async (jobId, customerId, session) => {
 
   const confirmed = await jobModel.findOneAndUpdate(
     { _id: jobId, status: "awaiting_confirmation", escrowStatus: "held" },
-    { $set: { status: "completed", confirmedAt: new Date(), autoReleaseAt: null } },
+    {
+      $set: {
+        status: "completed",
+        escrowStatus: "pending_release",
+        confirmedAt: new Date(),
+        autoReleaseAt: new Date(Date.now() + RELEASE_DELAY_MS),
+      },
+    },
     { returnDocument: "after", session },
   );
   if (!confirmed) {
     return { job: null, forbidden: false, notFound: false, invalidState: true };
   }
-  return { job: confirmed, forbidden: false, notFound: false, invalidState: false };
+  return {
+    job: confirmed,
+    forbidden: false,
+    notFound: false,
+    invalidState: false,
+  };
 };

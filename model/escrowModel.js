@@ -32,7 +32,7 @@ const escrowSchema = new mongoose.Schema(
       default: null,
       min: 0,
       validate: {
-        validator: Number.isInteger,
+        validator: (v) => v === null || Number.isInteger(v),
         message: "Amount must be in kobo",
       },
     },
@@ -41,7 +41,7 @@ const escrowSchema = new mongoose.Schema(
       default: null,
       min: 0,
       validate: {
-        validator: Number.isInteger,
+        validator: (v) => v === null || Number.isInteger(v),
         message: "Amount must be in kobo",
       },
     },

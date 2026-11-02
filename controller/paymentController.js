@@ -11,45 +11,61 @@ export const customerReleasePaymentContoller = async (req, res) => {
     const userId = req.user.id;
     const { jobId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(jobId)) {
-      return res.status(400).json({ success: false, message: "Invalid job ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid job ID" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
     if (user.role !== "customer") {
-      return res.status(403).json({ success: false, message: "Only customers can make this request" });
+      return res.status(403).json({
+        success: false,
+        message: "Only customers can make this request",
+      });
     }
 
     let result;
     await session.withTransaction(async () => {
       result = await customerReleasePayment(jobId, userId, session);
-      if (!result.job) return;
-
-      const escrowResult = await releaseEscrow(jobId, session);
-      if (escrowResult.notFound || escrowResult.notCompleted || escrowResult.notHeld) {
-        throw new Error("RELEASE_FAILED");
-      }
     });
 
     if (result.notFound) {
       return res.status(404).json({ success: false, message: "Job not found" });
     }
     if (result.forbidden) {
-      return res.status(403).json({ success: false, message: "You can't make this request" });
+      return res
+        .status(403)
+        .json({ success: false, message: "You can't make this request" });
     }
     if (result.invalidState) {
-      return res.status(409).json({ success: false, message: "Job is no longer awaiting confirmation" });
+      return res.status(409).json({
+        success: false,
+        message: "Job is no longer awaiting confirmation",
+      });
     }
 
-    return res.status(200).json({ success: true, message: "Payment released to the artisan", data: result.job });
+    return res.status(200).json({
+      success: true,
+      message:
+        "Job confirmed. Payment will be released to the artisan after the dispute window unless you raise a dispute.",
+      data: result.job,
+    });
   } catch (err) {
     if (err.message === "RELEASE_FAILED") {
-      return res.status(409).json({ success: false, message: "Payment can't be released for this job" });
+      return res.status(409).json({
+        success: false,
+        message: "Payment can't be released for this job",
+      });
     }
     console.error(err);
-    return res.status(500).json({ success: false, message: "Something went wrong" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
   } finally {
     session.endSession();
   }

@@ -34,5 +34,5 @@ router.get(
   verifyFundingController,
 );
 router.get("/wallet/history", authMiddleware, getTransactionsController);
-router.get("wallet/history/:id", authMiddleware, getTransactionController);
+router.get("/wallet/history/:id", authMiddleware, getTransactionController);
 export default router;

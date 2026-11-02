@@ -28,6 +28,7 @@ export const getWallet = async (userId, session = null) => {
 
 // Adds money to a user's wallet and records it in the ledger.
 // A reference that was already processed returns the original transaction
+// Create wallet for Artisan if they do not have one already
 // without crediting again. Internal use only, never expose as an endpoint.
 export const creditWallet = async (
   userId,
@@ -51,6 +52,11 @@ export const creditWallet = async (
     return { wallet: null, transaction: existing, duplicate: true };
   }
 
+  await walletModel.updateOne(
+    { User: userId },
+    { $setOnInsert: { balance: 0, status: "active", currency: "NGN" } },
+    { upsert: true, session },
+  );
   const wallet = await walletModel.findOneAndUpdate(
     {
       User: userId,
