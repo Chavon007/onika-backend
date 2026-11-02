@@ -231,7 +231,14 @@ export const CustomerActiveJob = async (customerId) => {
         ],
       },
     })
-    .populate("artisanId", "fullName phoneNumber")
+    .populate({
+      path: "artisanId",
+      select: "fullName phoneNumber",
+      populate: {
+        path: "artisanProfile",
+        select: "faceVerification",
+      },
+    })
     .sort({ createdAt: -1 });
 
   return { jobs: activeJobs };

@@ -85,7 +85,7 @@ export const getBankAccountsController = async (req, res) => {
 
     const { banks } = await getBankAccounts(userId);
 
-    res.status(200).json({ success: false, data: banks });
+    return res.status(200).json({ success: false, data: banks });
   } catch (err) {
     console.error(err);
     return res
@@ -98,7 +98,7 @@ export const getBankAccountsController = async (req, res) => {
 // logged-in user. Returns 404 if it doesn't exist or isn't theirs.
 export const deleteBankAccountController = async (req, res) => {
   try {
-    const userId = req.uer.id;
+    const userId = req.user.id;
     const accountId = req.params.id;
     const user = await User.findById(userId);
 
@@ -122,8 +122,8 @@ export const deleteBankAccountController = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res
-      .staus(500)
-      .json({ success: fasle, message: "Something went wrong" });
+      .status(500)
+      .json({ success: false, message: "Something went wrong" });
   }
 };
 
