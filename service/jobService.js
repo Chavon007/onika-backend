@@ -47,7 +47,7 @@ export const createJob = async ({
 export const findJobsForArtisan = async ({ skills, lga, artisanId }) => {
   const jobs = await jobModel
     .find({
-      typ: "public",
+      type: "public",
       category: { $in: skills },
       lga,
       status: "pending",
@@ -368,7 +368,7 @@ export const PrivateJobBooking = async ({
   if (!artisan) {
     return { job: null, notFound: true };
   }
-  const job = await jobModel.create(
+  const [job] = await jobModel.create(
     [
       {
         type: "private",

@@ -14,3 +14,6 @@ export const getTransferFee = (amount) => {
   if (amount >= 1000000) fee += STAMP_DUTY;
   return fee;
 };
+
+export const RELEASE_DELAY_MS =
+  (Number(process.env.ESCROW_RELEASE_DELAY_MINUTES) || 240) * 60 * 1000;
