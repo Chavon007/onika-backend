@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 
-
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -70,4 +69,15 @@ const userSchema = new mongoose.Schema(
   },
 );
 
+// User model
+userSchema.virtual("artisanProfile", {
+  ref: "ArtisanProfile",
+  localField: "_id",
+  foreignField: "User",
+  justOne: true,
+});
+
+// Needed so virtuals show up in JSON responses
+userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toObject", { virtuals: true });
 export default mongoose.model("User", userSchema);
