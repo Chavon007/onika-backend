@@ -222,13 +222,8 @@ export const CustomerActiveJob = async (customerId) => {
     .find({
       customerId,
       status: {
-        $in: [
-          "pending",
-          "in_progress",
-          "accepted",
-          "awaiting_confirmation",
-          "completed",
-        ],
+        $nin: ["completed", "cancelled"],
+        $in: ["pending", "in_progress", "accepted", "awaiting_confirmation"],
       },
     })
     .populate({
