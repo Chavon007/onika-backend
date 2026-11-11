@@ -9,6 +9,8 @@ import { validate } from "../middleware/validation.js";
 import {
   createNewJob,
   PrivateJobBookingController,
+  ArtisanCompletedJobController,
+  customerTotalSpentController,
   matchJob,
   matchJobDetails,
   acceptJobController,
@@ -51,6 +53,7 @@ router.get(
   authMiddleware,
   privateJobBookingDetailsController,
 );
+router.get("/jobs/completed", authMiddleware, ArtisanCompletedJobController);
 router.get("/jobs/history", authMiddleware, customerJobHistoryController);
 router.get("/jobs/pending", authMiddleware, matchJob);
 router.get(
@@ -60,6 +63,7 @@ router.get(
 );
 
 router.get("/jobs/artisan-active", authMiddleware, artisanActiveJobController);
+router.get("/jobs/total-spent", authMiddleware, customerTotalSpentController);
 router.get("/jobs/:jobId", authMiddleware, matchJobDetails);
 router.patch("/jobs/:jobId/accept", authMiddleware, acceptJobController);
 router.patch("/jobs/:jobId/reject", authMiddleware, rejectJobController);

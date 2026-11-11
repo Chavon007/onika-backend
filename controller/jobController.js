@@ -16,6 +16,8 @@ import {
   privateJobBookingDetails,
   rejectPrivateJobBooking,
   acceptPrivateJobBooking,
+  ArtisanCompletedJob,
+  customerTotalSpent,
 } from "../service/jobService.js";
 import {
   holdEscrow,
@@ -304,6 +306,32 @@ export const rejectJobController = async (req, res) => {
   }
 };
 
+export const ArtisanCompletedJobController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "artisan") {
+      return res.status(403).json({
+        success: false,
+        message: "Only aristan can make this request",
+      });
+    }
+
+    const jobs = await ArtisanCompletedJob(userId);
+
+    return res.status(200).json({ success: true, data: jobs });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 // Returns all jobs currently accepted by the logged-in artisan (their active work).
 export const artisanActiveJobController = async (req, res) => {
   try {
@@ -925,5 +953,32 @@ export const rejectPrivateJobBookingController = async (req, res) => {
       .json({ success: false, message: "Something went wrong" });
   } finally {
     session.endSession();
+  }
+};
+
+export const customerTotalSpentController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User does not exist" });
+    }
+
+    if (user.role !== "customer") {
+      return res.status(403).json({
+        success: false,
+        message: "Only a customer can make this request",
+      });
+    }
+
+    const totalSpent = await customerTotalSpent(userId);
+
+    res.status(200).json({ success: true, data: totalSpent });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
