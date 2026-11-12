@@ -2,7 +2,7 @@ import escrowModel from "../model/escrowModel.js";
 import jobModel from "../model/jobModel.js";
 import { debitWallet } from "./walletService.js";
 import { creditWallet } from "./walletService.js";
-
+import mongoose from "mongoose";
 import { COMMISSION_RATE, PLATFORM_USER_ID } from "../config/platform.js";
 
 // Takes the job price from the customer's wallet and holds it in escrow.
@@ -294,4 +294,29 @@ export const freezeEscrow = async (jobId, session) => {
   );
 
   return { escrow, notFound: false, notHeld: false };
+};
+
+export const customerAmountInEscrow = async (customerId) => {
+  const escrowBalance = await escrowModel.aggregate([
+    {
+      $match: {
+        customerId: new mongoose.Types.ObjectId(customerId),
+        status: { $in: ["held", "frozen"] },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalEscrow: { $sum: "$amount" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        totalEscrow: 1,
+      },
+    },
+  ]);
+
+  return escrowBalance[0]?.totalEscrow || 0;
 };

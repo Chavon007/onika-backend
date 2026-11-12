@@ -1,6 +1,7 @@
 import jobModel from "../model/jobModel.js";
 import ArtisanProfileSchema from "../model/artisanProfileModel.js";
 import User from "../model/auth.js";
+import mongoose from "mongoose";
 
 const AUTO_RELEASE_MS = 48 * 60 * 60 * 1000;
 // Creates a new job posting on behalf of a customer.
@@ -215,8 +216,19 @@ export const ArtisanStartJob = async (jobId, artisanId) => {
   return { job: updatedJob, forbidden: false, notFound: false };
 };
 
-// let's customer get live update on a job they post
+export const ArtisanCompletedJob = async (artisanId) => {
+  const jobs = await jobModel
+    .find({
+      artisanId,
+      status: "completed",
+    })
+    .sort({
+      completedAt: -1,
+    });
 
+  return jobs;
+};
+// let's customer get live update on a job they post
 export const CustomerActiveJob = async (customerId) => {
   const activeJobs = await jobModel
     .find({
@@ -485,3 +497,44 @@ export const acceptPrivateJobBooking = async (jobId, artisanId, session) => {
     invalidState: false,
   };
 };
+
+export const customerTotalSpent = async (customerId) => {
+  const totalSpent = await jobModel.aggregate([
+    {
+      $match: {
+        customerId: new mongoose.Types.ObjectId(customerId),
+        status: "completed",
+        escrowStatus: "released",
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalSpent: { $sum: "$price" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        totalSpent: 1,
+      },
+    },
+  ]);
+
+  return totalSpent[0]?.totalSpent || 0;
+};
+
+export const customerCompletedJobs = async (customerId) => {
+  const jobs = await jobModel
+    .find({
+      customerId,
+      status: "completed",
+    })
+    .sort({
+      completedAt: -1,
+    });
+
+  return jobs;
+};
+
+
