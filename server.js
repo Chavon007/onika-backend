@@ -20,6 +20,7 @@ import WalletRoute from "./route/walletRoute.js";
 import BankRouter from "./route/bankRoute.js";
 import { startAutoReleaseJob } from "./jobs/autoReleaseJob.js";
 import WithdrawalRouter from "./route/withdrawalRoute.js";
+import EscrowRouter from "./route/escrowRoute.js";
 const app = express();
 
 app.post(
@@ -49,6 +50,7 @@ app.use("/api", PaymentRoute);
 app.use("/api", WalletRoute);
 app.use("/api", BankRouter);
 app.use("/api", WithdrawalRouter);
+app.use("/api/escrow", EscrowRouter);
 
 const startServer = async () => {
   try {

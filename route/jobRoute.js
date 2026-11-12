@@ -26,7 +26,9 @@ import {
   privateJobBookingDetailsController,
   rejectPrivateJobBookingController,
   acceptPrivateJobBookingController,
+  customerCompletedJobsController,
 } from "../controller/jobController.js";
+
 const router = express.Router();
 
 router.post(
@@ -54,6 +56,11 @@ router.get(
   privateJobBookingDetailsController,
 );
 router.get("/jobs/completed", authMiddleware, ArtisanCompletedJobController);
+router.get(
+  "/jobs/completed/customer",
+  authMiddleware,
+  customerCompletedJobsController,
+);
 router.get("/jobs/history", authMiddleware, customerJobHistoryController);
 router.get("/jobs/pending", authMiddleware, matchJob);
 router.get(

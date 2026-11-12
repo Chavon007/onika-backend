@@ -523,3 +523,18 @@ export const customerTotalSpent = async (customerId) => {
 
   return totalSpent[0]?.totalSpent || 0;
 };
+
+export const customerCompletedJobs = async (customerId) => {
+  const jobs = await jobModel
+    .find({
+      customerId,
+      status: "completed",
+    })
+    .sort({
+      completedAt: -1,
+    });
+
+  return jobs;
+};
+
+
