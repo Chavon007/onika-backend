@@ -28,5 +28,5 @@ router.post("/login", authLimiter, loginValidator, validate, login);
 router.post("/verify-otp", authLimiter, OTPValidator, validate, verifyOtp);
 router.post("/logout", authMiddleware, logout);
 router.get("/me", authMiddleware, getMe);
-router.get("/refresh", refresh);
+router.post("/refresh", refresh);
 export default router;
