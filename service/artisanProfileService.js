@@ -4,6 +4,7 @@ import {
   verifyBVN,
   verifyFaceMatch,
 } from "./verificationService.js";
+import { normalizeText, normalizeList } from "../utliz/normalize.js";
 
 const runVerificationChecks = async (profile, user) => {
   const [firstname, ...rest] = user.fullName.trim().split(" ");
@@ -46,7 +47,8 @@ export const createArtisanProfile = async (userId, user, payload) => {
   const createArtisan = await artisanProfileModel.create({
     User: userId,
     bio: payload.bio,
-    skills: payload.skills,
+    // Skills are stored lowercase so they match job categories
+    skills: normalizeList(payload.skills),
     experience: payload.experience,
     nin: payload.nin,
     bvn: payload.bvn,
@@ -66,7 +68,7 @@ export const getAllArtisan = async ({ skill } = {}) => {
   const filter = {};
 
   if (skill) {
-    filter.skills = skill;
+    filter.skills = normalizeText(skill);
   }
   const allArtisan = await artisanProfileModel
     .find({ verificationStatus: "verified", ...filter })

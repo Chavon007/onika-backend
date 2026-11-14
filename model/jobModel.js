@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import { normalizeText } from "../utliz/normalize.js";
 const requiredForPublic = function () {
   return this.type === "public";
 };
@@ -22,6 +22,7 @@ const JobSchema = new mongoose.Schema(
     category: {
       type: String,
       required: requiredForPublic,
+      set: normalizeText,
     },
     type: {
       type: String,
@@ -91,6 +92,7 @@ const JobSchema = new mongoose.Schema(
     city: {
       type: String,
       required: requiredForPublic,
+      set: normalizeText,
     },
     confirmedAt: {
       type: Date,
@@ -119,6 +121,7 @@ const JobSchema = new mongoose.Schema(
     lga: {
       type: String,
       required: requiredForPublic,
+      set: normalizeText,
     },
     address: {
       type: String,
@@ -127,6 +130,7 @@ const JobSchema = new mongoose.Schema(
     state: {
       type: String,
       required: requiredForPublic,
+      set: normalizeText,
     },
     disputeReason: {
       type: String,
@@ -135,6 +139,7 @@ const JobSchema = new mongoose.Schema(
     landmark: {
       type: String,
       required: requiredForPublic,
+      set: normalizeText,
     },
     images: {
       type: [String],

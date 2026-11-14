@@ -2,6 +2,7 @@ import { hashPassword, comparePassword } from "../utliz/hash.js";
 import User from "../model/auth.js";
 import { generateToken, generateRefreshToken } from "../utliz/token.js";
 import sendOtpEmail from "../utliz/sendEmail.js";
+import { normalizeText, normalizeEmail } from "../utliz/normalize.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -10,6 +11,7 @@ const OTP_EXPIRY_MINUTES = 5;
 const SALT_OTP = 10;
 
 export const generateOTP = async ({ email }) => {
+  email = normalizeEmail(email);
   const user = await User.findOne({ email });
 
   if (!user) throw new Error("User not found");
@@ -37,6 +39,7 @@ const createAccountService = async ({
   password,
   lga,
 }) => {
+  email = normalizeEmail(email);
   const existingUser = await User.findOne({ email });
 
   if (existingUser) {
@@ -44,13 +47,14 @@ const createAccountService = async ({
     err.statusCode = 409;
     throw err;
   }
+  // Password is hashed exactly as typed. It is never normalized.
   const hashed = await hashPassword(password);
   const user = await User.create({
     fullName,
     role,
     password: hashed,
-    state,
-    lga,
+    state: normalizeText(state),
+    lga: normalizeText(lga),
     email,
     phoneNumber,
   });
@@ -61,13 +65,14 @@ const createAccountService = async ({
 };
 
 export const loginService = async ({ email, password }) => {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: normalizeEmail(email) });
   if (!user) {
     const err = new Error("Invalid credentials");
     err.statusCode = 401;
     throw err;
   }
 
+  // Password is compared exactly as typed. It is never normalized.
   const isMatch = await comparePassword(password, user.password);
   if (!isMatch) {
     const err = new Error("Invalid credentials");
@@ -87,7 +92,7 @@ export const loginService = async ({ email, password }) => {
 };
 
 export const fetchUser = async ({ email }) => {
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: normalizeEmail(email) });
 
   if (!user) {
     const err = new Error("User does not have account");
@@ -99,7 +104,7 @@ export const fetchUser = async ({ email }) => {
   return userObject;
 };
 export const OtpService = async ({ OTP, email }) => {
-  const existingUser = await User.findOne({ email });
+  const existingUser = await User.findOne({ email: normalizeEmail(email) });
 
   if (!existingUser) {
     const err = new Error("User does not exist");

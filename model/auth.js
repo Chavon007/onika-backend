@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import { normalizeText } from "../utliz/normalize.js";
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -38,11 +38,13 @@ const userSchema = new mongoose.Schema(
     state: {
       type: String,
       required: true,
+      set: normalizeText,
     },
 
     lga: {
       type: String,
       required: true,
+      set: normalizeText,
     },
 
     password: {

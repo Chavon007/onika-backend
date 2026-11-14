@@ -2,10 +2,17 @@ import jobModel from "../model/jobModel.js";
 import ArtisanProfileSchema from "../model/artisanProfileModel.js";
 import User from "../model/auth.js";
 import mongoose from "mongoose";
+import { normalizeText, normalizeList } from "../utliz/normalize.js";
 
 const AUTO_RELEASE_MS = 48 * 60 * 60 * 1000;
+
+// Case-insensitive check: does the artisan have the skill this job needs?
+const hasSkill = (skills, category) =>
+  normalizeList(skills).includes(normalizeText(category));
+
 // Creates a new job posting on behalf of a customer.
 // Takes the raw job fields from the request and saves them to the database.
+// category, state, city and lga are normalized so "Ikeja" and "ikeja" match.
 export const createJob = async ({
   customerId,
   category,
@@ -24,14 +31,14 @@ export const createJob = async ({
     [
       {
         customerId,
-        category,
+        category: normalizeText(category),
         description,
         price,
-        state,
+        state: normalizeText(state),
         address,
-        city,
+        city: normalizeText(city),
         landmark,
-        lga,
+        lga: normalizeText(lga),
         images,
         priority,
       },
@@ -45,12 +52,13 @@ export const createJob = async ({
 // Returns the list of jobs an artisan can currently see and act on.
 // Only pending jobs matching the artisan's skills and location are shown,
 // and jobs the artisan has already rejected are excluded via rejectedBy.
+// Skills and lga are normalized so casing never hides a job.
 export const findJobsForArtisan = async ({ skills, lga, artisanId }) => {
   const jobs = await jobModel
     .find({
       type: "public",
-      category: { $in: skills },
-      lga,
+      category: { $in: normalizeList(skills) },
+      lga: normalizeText(lga),
       status: "pending",
       rejectedBy: { $ne: artisanId },
     })
@@ -76,7 +84,7 @@ export const findJobsForArtisanDetails = async (jobId, skills, artisanId) => {
     return { job: null, forbidden: true };
   }
 
-  const isAllowed = skills.includes(job.category);
+  const isAllowed = hasSkill(skills, job.category);
   if (!isAllowed) {
     return { job: null, forbidden: true };
   }
@@ -92,7 +100,7 @@ export const ArtisanAcceptJob = async (jobId, artisanId, skills, session) => {
   if (!job) {
     return { job: null, forbidden: false, notFound: true, alreadyTaken: false };
   }
-  const isAllowed = skills.includes(job.category);
+  const isAllowed = hasSkill(skills, job.category);
   if (!isAllowed) {
     return { job: null, forbidden: true, notFound: false, alreadyTaken: false };
   }
@@ -128,7 +136,7 @@ export const ArtisanRejectJob = async (jobId, artisanId, skills) => {
   if (!job) {
     return { job: null, forbidden: false, notFound: true };
   }
-  const isAllowed = skills.includes(job.category);
+  const isAllowed = hasSkill(skills, job.category);
   if (!isAllowed) {
     return { job: null, forbidden: true, notFound: false };
   }
@@ -536,5 +544,3 @@ export const customerCompletedJobs = async (customerId) => {
 
   return jobs;
 };
-
-
