@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-
+import { normalizeText } from "../utliz/normalize.js";
 const ArtisanProfileSchema = new mongoose.Schema(
   {
     User: {
@@ -14,7 +14,7 @@ const ArtisanProfileSchema = new mongoose.Schema(
       maxlength: 500,
     },
     skills: {
-      type: [String],
+      type: [{ type: String, set: normalizeText }],
       required: true,
       validate: {
         validator: (arr) => arr.length > 0,
