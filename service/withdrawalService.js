@@ -26,7 +26,12 @@ const FAILED_TRANSFER_STATUSES = [
 // as pending with a copy of the bank details. Runs inside the caller's session,
 // so the debit and the record save together or not at all.
 // Throws if the balance is too low.
-export const requestWithdrawal = async (userId, amount, session) => {
+export const requestWithdrawal = async (
+  userId,
+  amount,
+  session,
+  bankAccountId,
+) => {
   if (!session) throw new Error("A database session is required");
   if (!Number.isInteger(amount) || amount < MIN_WITHDRAWAL) {
     return {
@@ -41,7 +46,7 @@ export const requestWithdrawal = async (userId, amount, session) => {
   const netAmount = amount - fee;
 
   const account = await bankAccountModel
-    .findOne({ User: userId })
+    .findOne({ _id: bankAccountId, User: userId })
     .session(session);
   if (!account) {
     return {

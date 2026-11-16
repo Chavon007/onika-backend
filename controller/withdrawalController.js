@@ -14,6 +14,7 @@ export const requestWithdrawalController = async (req, res) => {
   try {
     const userId = req.user.id;
     const amount = Number(req.body.amount);
+    const bankAccountId = req.body.bankAccountId;
 
     const user = await User.findById(userId);
     if (!user) {
@@ -24,7 +25,7 @@ export const requestWithdrawalController = async (req, res) => {
 
     let result;
     await session.withTransaction(async () => {
-      result = await requestWithdrawal(userId, amount, session);
+      result = await requestWithdrawal(userId, amount, session, bankAccountId);
     });
 
     if (result.belowMinimum) {
