@@ -1,3 +1,4 @@
+
 import createAccountService from "../service/authService.js";
 import {
   loginService,
@@ -12,6 +13,14 @@ import {
   generateToken,
 } from "../utliz/token.js";
 import User from "../model/auth.js";
+
+const isProduction = process.env.NODE_ENV === "production";
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+};
 
 const createAccount = async (req, res) => {
   try {
@@ -33,16 +42,14 @@ const createAccount = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { user, token, refreshToken } = await loginService(req.body);
+
     res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000,
     });
+
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -67,24 +74,22 @@ export const getMe = async (req, res) => {
       .json({ success: false, message: err.message });
   }
 };
+
 export const verifyOtp = async (req, res) => {
   try {
     const { email, OTP } = req.body;
     const { user, token, refreshToken } = await OtpService({ OTP, email });
 
     res.cookie("token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000,
     });
 
     res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
+
     res.status(200).json({ success: true, message: "Verification successful" });
   } catch (err) {
     res
@@ -120,32 +125,18 @@ export const logout = async (req, res) => {
       }
     }
 
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-    });
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-    });
+    res.clearCookie("token", cookieOptions);
+    res.clearCookie("refreshToken", cookieOptions);
 
     res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (err) {
-    res.clearCookie("token", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-    });
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-    });
+    res.clearCookie("token", cookieOptions);
+    res.clearCookie("refreshToken", cookieOptions);
+
     res.status(200).json({ success: true, message: "Logged out successfully" });
   }
 };
+
 export const refresh = async (req, res) => {
   try {
     const refreshToken = req.cookies.refreshToken;
@@ -163,19 +154,20 @@ export const refresh = async (req, res) => {
         message: "Session expired, please login again",
       });
     }
+
     const decoded = verifyRefreshToken(refreshToken);
     const user = await User.findById(decoded.id);
+
     if (!user) {
       return res
         .status(401)
         .json({ success: false, message: "User not found" });
     }
+
     const newAccessToken = generateToken(user);
 
     res.cookie("token", newAccessToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000,
     });
 
@@ -187,7 +179,9 @@ export const refresh = async (req, res) => {
         message: "Session expired, please login again",
       });
     }
+
     res.status(401).json({ success: false, message: "Invalid refresh token" });
   }
 };
+
 export default createAccount;
