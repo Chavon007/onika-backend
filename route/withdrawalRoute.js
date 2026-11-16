@@ -16,7 +16,7 @@ export const withdrawalValidator = [
 const router = express.Router();
 
 router.post(
-  "/withdraw",
+  "/withdrawal",
   authMiddleware,
   withdrawalValidator,
   validate,
